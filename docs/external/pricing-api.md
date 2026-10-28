@@ -54,7 +54,9 @@ The service validates your input and faithfully sends it. That's the deal.
 ```python
 from peek_app_utilities import PeekAccessService, PeekAccessServiceConfig
 
-async with PeekAccessService(PeekAccessServiceConfig(...)) as peek:  # install_id, jwt_secret, issuer, api_url
+async with PeekAccessService(
+    PeekAccessServiceConfig(...)
+) as peek:  # install_id, jwt_secret, issuer, api_url
     activities = await peek.get_product_service().get_all_activities()
     activity = activities[0]
     # activity.product_id → the activity_id
@@ -86,11 +88,11 @@ from peek_app_utilities import (
     PricingOverride,
     UpdateEngineInput,
     UpsertOverridesInput,
-    FixedResourceOptionOverride,       # mode "fixed":      id + price (PricingMoney)
+    FixedResourceOptionOverride,  # mode "fixed":      id + price (PricingMoney)
     PercentageResourceOptionOverride,  # mode "percentage": id + percentage_adjustment
-    SpotsTakenBounds,                  # min_spots / max_spots (both optional)
-    SpotsTakenFilter,                  # spots_taken=SpotsTakenBounds(...)
-    StartTimeRangeFilter,              # start_time_range="[HH:MM:SS,HH:MM:SS]"
+    SpotsTakenBounds,  # min_spots / max_spots (both optional)
+    SpotsTakenFilter,  # spots_taken=SpotsTakenBounds(...)
+    StartTimeRangeFilter,  # start_time_range="[HH:MM:SS,HH:MM:SS]"
 )
 ```
 
@@ -172,7 +174,9 @@ input = UpsertOverridesInput(
                         ),
                     ],
                     filters=[
-                        SpotsTakenFilter(spots_taken=SpotsTakenBounds(min_spots=4)),  # "once 4 spots are taken" (§6)
+                        SpotsTakenFilter(
+                            spots_taken=SpotsTakenBounds(min_spots=4)
+                        ),  # "once 4 spots are taken" (§6)
                         morning,  # only the morning window
                     ],
                 ),
@@ -196,7 +200,9 @@ Prefer a **percentage** adjustment instead of a fixed price? Swap the
 `resource_options` entry:
 
 ```python
-PercentageResourceOptionOverride(id="ticket-adult", percentage_adjustment="-25")  # 25% off; must be > -100
+PercentageResourceOptionOverride(
+    id="ticket-adult", percentage_adjustment="-25"
+)  # 25% off; must be > -100
 ```
 
 ### Step 3 — Send it

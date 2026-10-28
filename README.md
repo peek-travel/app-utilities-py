@@ -45,10 +45,10 @@ from peek_app_utilities import PeekAccessService, PeekAccessServiceConfig, Produ
 async def main() -> None:
     async with PeekAccessService(
         PeekAccessServiceConfig(
-            install_id="install-123",                      # JWT subject
-            jwt_secret=os.environ["PEEK_INTERNAL_SECRET"], # signs the JWT
-            issuer=os.environ["APP_NAME"],                 # JWT issuer
-            api_url=install.api_url,                       # the install webhook's api_url
+            install_id="install-123",  # JWT subject
+            jwt_secret=os.environ["PEEK_INTERNAL_SECRET"],  # signs the JWT
+            issuer=os.environ["APP_NAME"],  # JWT issuer
+            api_url=install.api_url,  # the install webhook's api_url
         )
     ) as peek:
         products: list[Product] = await peek.get_product_service().get_all_products()
@@ -145,8 +145,13 @@ from peek_app_utilities import AccessOptions, PeekAccessService, PeekAccessServi
 
 peek = PeekAccessService(
     PeekAccessServiceConfig(
-        install_id=install_id, jwt_secret=jwt_secret, issuer=issuer, api_url=api_url,
-        access_options=AccessOptions(full_customer_access=True),  # opt into PII + payment operations
+        install_id=install_id,
+        jwt_secret=jwt_secret,
+        issuer=issuer,
+        api_url=api_url,
+        access_options=AccessOptions(
+            full_customer_access=True
+        ),  # opt into PII + payment operations
     )
 )
 ```
@@ -343,7 +348,12 @@ and **ACME** backoffices. They share the same config shape (minus the Peek-only
 minimal today (products only):
 
 ```python
-from peek_app_utilities import AcmeAccessService, AcmeAccessServiceConfig, CngAccessService, CngAccessServiceConfig
+from peek_app_utilities import (
+    AcmeAccessService,
+    AcmeAccessServiceConfig,
+    CngAccessService,
+    CngAccessServiceConfig,
+)
 
 async with CngAccessService(
     CngAccessServiceConfig(install_id=..., jwt_secret=..., issuer=..., api_url=install.api_url)
