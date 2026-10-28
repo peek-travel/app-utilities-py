@@ -349,11 +349,11 @@ render({
     {name:"jwt_secret",type:"str",n:false,desc:"HMAC secret used to sign the JWT. Required."},
     {name:"issuer",type:"str",n:false,desc:"JWT issuer — the app name / app ID. Required."},
     {name:"api_url",type:"str | None",n:"opt",desc:"The install's <b>base API URL</b> (persist the install webhook's <code>api_url</code>). The product service appends the <code>cng_backoffice_api-v1</code> slug and the request path. A slug already on the URL (dashes or underscores) is stripped back to the base; a different platform's slug makes the constructor raise. No app-id segment is inserted (so <code>app_id</code> is not required). Preferred over <code>base_url</code>/<code>app_id</code>."},
-    {name:"app_id",type:"str | None",n:"opt",desc:"<b>Deprecated.</b> App ID inserted into the endpoint path. Required only in legacy <code>base_url</code> mode."},
+    {name:"app_id",type:"str | None",n:"opt",desc:"<b>Deprecated.</b> App ID appended to <code>base_url</code>. Required only in legacy <code>base_url</code> mode."},
     {name:"base_url",type:"str | None",n:"opt",desc:"<b>Deprecated.</b> Override the base URL. Default the app-registry installations API. Prefer <code>api_url</code>."},
     {name:"token_ttl_seconds",type:"int | None",n:"opt",desc:"JWT lifetime in seconds. Default 3600."},
     {name:"token_refresh_leeway_seconds",type:"int | None",n:"opt",desc:"Re-mint the cached token this many seconds before expiry. Default 60."},
-    {name:"retry_delays_ms",type:"Sequence[int] | None",n:"opt",desc:"Backoff delays (ms) for HTTP 429 retries. Default <code>(1000, 2000, 4000)</code>."},
+    {name:"retry_delays_ms",type:"Sequence[int] | None",n:"opt",desc:"Backoff delays (ms) for rate-limit (429) retries. Default <code>(1000, 2000, 4000)</code>."},
     {name:"logger",type:"Logger | None",n:"opt",desc:"Optional logger. Default no-op (silent)."},
     {name:"http_client",type:"httpx.AsyncClient | None",n:"opt",desc:"Custom <code>httpx.AsyncClient</code>. Default one owned by the access service (closed by <code>aclose()</code> / <code>async with</code>). A caller-supplied client is never closed by the package."},
     {name:"access_options",type:"AccessOptions | None",n:"opt",desc:"Cross-cutting access options (PII exposure). Inert for CNG today — CNG's only service reads no customer PII."}

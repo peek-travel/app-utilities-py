@@ -25,6 +25,8 @@ jobs:
         run: uv run mypy
       - name: Test (95% coverage gate)
         run: uv run pytest --cov --cov-report=term-missing --cov-report=xml
+      - name: HTML reference check
+        run: node docs/html/check.mjs
       - name: Harness compiles
         run: uv run python -m py_compile scripts/gql_cli/cli.py
       - name: Build

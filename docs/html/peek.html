@@ -532,7 +532,7 @@ render({
   {name:"PeekAccessServiceConfig",kind:"config",file:"src/peek_app_utilities/peek_access_service.py",extends:"BaseAccessServiceConfig",
    desc:"Constructor config for <code>PeekAccessService</code> — a frozen, keyword-only dataclass. Adds the Peek-only fields below; all other fields are inherited.",
    fields:[
-    {name:"gateway_key",type:"str | None",n:"opt",desc:"API gateway key, sent as the <code>pk-api-key</code> header. Required in the legacy v1 mode (no <code>api_url</code>, no <code>mode=\"v2\"</code>); not used otherwise."},
+    {name:"gateway_key",type:"str | None",n:"opt",desc:"API gateway key for the legacy v1 route. Required in the legacy v1 mode (no <code>api_url</code>, no <code>mode=\"v2\"</code>); not used otherwise."},
     {name:"mode",type:"GatewayMode | None",n:"opt",desc:"Gateway mode. <code>\"v2\"</code> routes through the app-registry installations API; <code>None</code> (default) is the legacy v1 backoffice route. <code>api_url</code>, when set, supersedes this."},
     {name:"item_options_page_size",type:"int | None",n:"opt",desc:"Page size for cursor-paginated item options. Default 50."}
    ]},
@@ -543,11 +543,11 @@ render({
     {name:"jwt_secret",type:"str",n:false,desc:"HMAC secret used to sign the JWT. Required."},
     {name:"issuer",type:"str",n:false,desc:"JWT issuer — the app name / app ID. Required."},
     {name:"api_url",type:"str | None",n:"opt",desc:"The install's <b>base API URL</b> (persist the install webhook's <code>api_url</code>). Each service class appends its own backoffice slug (e.g. <code>peek_backoffice_api-v1</code>) when it calls, so different platforms route through different slugs. If the URL you pass already carries this platform's slug (dashes or underscores) it is stripped back to the base; a URL carrying a different platform's slug makes the constructor raise <code>ValueError</code>. No app-id segment is inserted (so <code>app_id</code> is not required). Preferred over <code>base_url</code>/<code>app_id</code>."},
-    {name:"app_id",type:"str | None",n:"opt",desc:"<b>Deprecated.</b> App ID inserted into the endpoint path. Required only in legacy <code>base_url</code> mode."},
+    {name:"app_id",type:"str | None",n:"opt",desc:"<b>Deprecated.</b> App ID appended to <code>base_url</code>. Required only in legacy <code>base_url</code> mode."},
     {name:"base_url",type:"str | None",n:"opt",desc:"<b>Deprecated.</b> Override the base URL (per-service default). Prefer <code>api_url</code>."},
     {name:"token_ttl_seconds",type:"int | None",n:"opt",desc:"JWT lifetime in seconds. Default 3600."},
     {name:"token_refresh_leeway_seconds",type:"int | None",n:"opt",desc:"Re-mint the cached token this many seconds before expiry. Default 60."},
-    {name:"retry_delays_ms",type:"Sequence[int] | None",n:"opt",desc:"Backoff delays (ms) for HTTP 429 retries. Default <code>(1000, 2000, 4000)</code>."},
+    {name:"retry_delays_ms",type:"Sequence[int] | None",n:"opt",desc:"Backoff delays (ms) for rate-limit (429) retries. Default <code>(1000, 2000, 4000)</code>."},
     {name:"logger",type:"Logger | None",n:"opt",desc:"Optional logger. Default no-op (silent)."},
     {name:"http_client",type:"httpx.AsyncClient | None",n:"opt",desc:"Custom <code>httpx.AsyncClient</code>. Default one owned by the access service (closed by <code>aclose()</code> / <code>async with</code>). A caller-supplied client is never closed by the package."},
     {name:"access_options",type:"AccessOptions | None",n:"opt",desc:"Cross-cutting access options (PII exposure). Defaults to <code>full_customer_access=False</code>. Threaded to the resource services that read customer data."}
@@ -664,7 +664,7 @@ render({
     {name:"action",type:"GuideAssignmentAction",n:false,desc:"Assign or unassign."}
    ]},
   {name:"GuideAssignmentAction",kind:"type",file:"src/peek_app_utilities/models/peek/timeslot.py",
-   desc:"Whether a <code>GuideAssignment</code> assigns or unassigns guides. Sibling const: <code>GUIDE_ASSIGNMENT_ACTIONS</code>. Import from <code>peek_app_utilities.models.peek.timeslot</code>.",def:'Literal["assign", "unassign"]'},
+   desc:"Whether a <code>GuideAssignment</code> assigns or unassigns guides. Sibling const: <code>GUIDE_ASSIGNMENT_ACTIONS</code>.",def:'Literal["assign", "unassign"]'},
   {name:"AssignGuideResult",kind:"dataclass",file:"src/peek_app_utilities/models/peek/timeslot.py",desc:"Result of <code>assign_guide</code>.",
    fields:[
     {name:"status",type:"AssignGuideStatus",n:false,desc:"Outcome."},
@@ -672,8 +672,8 @@ render({
     {name:"errors",type:"list[AssignGuideError] | None",n:true,desc:"Error details on failure, else <code>None</code>."}
    ]},
   {name:"AssignGuideStatus",kind:"type",file:"src/peek_app_utilities/models/peek/timeslot.py",
-   desc:"Outcome of a guide (un)assignment request. Import from <code>peek_app_utilities.models.peek.timeslot</code>.",def:'Literal["success", "error"]'},
-  {name:"AssignGuideError",kind:"dataclass",file:"src/peek_app_utilities/models/peek/timeslot.py",desc:"A single error reported by a failed guide (un)assignment. Import from <code>peek_app_utilities.models.peek.timeslot</code>.",
+   desc:"Outcome of a guide (un)assignment request.",def:'Literal["success", "error"]'},
+  {name:"AssignGuideError",kind:"dataclass",file:"src/peek_app_utilities/models/peek/timeslot.py",desc:"A single error reported by a failed guide (un)assignment.",
    fields:[{name:"message",type:"str",n:false,desc:"Error message from Peek (<code>\"Unknown error\"</code> when none)."}]},
   {name:"Channel",kind:"dataclass",file:"src/peek_app_utilities/models/peek/channel.py",desc:"A reseller channel.",
    fields:[
@@ -717,7 +717,7 @@ render({
     {name:"currency",type:"str | None",n:"opt",desc:"ISO currency for fixed discounts (default <code>USD</code>)."}
    ]},
   {name:"PromoDiscountType",kind:"type",file:"src/peek_app_utilities/models/peek/promo_code.py",
-   desc:"Whether a promo-code amount is a percentage or a fixed monetary value. Sibling const: <code>PROMO_DISCOUNT_TYPES</code>. Import from <code>peek_app_utilities.models.peek.promo_code</code>.",def:'Literal["percent", "fixed"]'},
+   desc:"Whether a promo-code amount is a percentage or a fixed monetary value. Sibling const: <code>PROMO_DISCOUNT_TYPES</code>.",def:'Literal["percent", "fixed"]'},
   {name:"CreatedPromoCode",kind:"dataclass",file:"src/peek_app_utilities/models/peek/promo_code.py",desc:"Result of creating a promo code.",
    fields:[
     {name:"id",type:"str",n:false,desc:"New promo code id."},
@@ -754,13 +754,13 @@ render({
    ]},
   {name:"ResourceOptionOverride",kind:"union",file:"src/peek_app_utilities/models/peek/pricing.py",desc:"Per-ticket override. Discriminated union on <code>mode</code> — one dataclass per variant.",
    def:"FixedResourceOptionOverride | PercentageResourceOptionOverride"},
-  {name:"FixedResourceOptionOverride",kind:"input",file:"src/peek_app_utilities/models/peek/pricing.py",desc:"A ticket (resource option) price override that <b>replaces</b> the ticket price outright. Import from <code>peek_app_utilities.models.peek.pricing</code>.",
+  {name:"FixedResourceOptionOverride",kind:"input",file:"src/peek_app_utilities/models/peek/pricing.py",desc:"A ticket (resource option) price override that <b>replaces</b> the ticket price outright.",
    fields:[
     {name:"id",type:"str",n:false,desc:"The Peek resource-option (ticket) id being overridden."},
     {name:"price",type:"PricingMoney",n:false,desc:"The replacement price (3-letter uppercase currency, numeric amount)."},
     {name:"mode",type:'Literal["fixed"]',n:false,desc:"Discriminant; defaults to <code>\"fixed\"</code>."}
    ]},
-  {name:"PercentageResourceOptionOverride",kind:"input",file:"src/peek_app_utilities/models/peek/pricing.py",desc:"A ticket (resource option) price override that <b>adjusts</b> the ticket price by a percentage. Import from <code>peek_app_utilities.models.peek.pricing</code>.",
+  {name:"PercentageResourceOptionOverride",kind:"input",file:"src/peek_app_utilities/models/peek/pricing.py",desc:"A ticket (resource option) price override that <b>adjusts</b> the ticket price by a percentage.",
    fields:[
     {name:"id",type:"str",n:false,desc:"The Peek resource-option (ticket) id being overridden."},
     {name:"percentage_adjustment",type:"str",n:false,desc:"Decimal string, e.g. <code>\"-25\"</code> for 25% off. Must be <code>&gt; -100</code>."},
@@ -768,14 +768,14 @@ render({
    ]},
   {name:"PricingOverrideFilter",kind:"union",file:"src/peek_app_utilities/models/peek/pricing.py",desc:"Filter gating when an override applies. An override may carry zero/one/both variants.",
    def:"SpotsTakenFilter | StartTimeRangeFilter"},
-  {name:"SpotsTakenFilter",kind:"input",file:"src/peek_app_utilities/models/peek/pricing.py",desc:"Restricts an override by how many spots are already taken. Import from <code>peek_app_utilities.models.peek.pricing</code>.",
+  {name:"SpotsTakenFilter",kind:"input",file:"src/peek_app_utilities/models/peek/pricing.py",desc:"Restricts an override by how many spots are already taken.",
    fields:[{name:"spots_taken",type:"SpotsTakenBounds",n:false,desc:"The inclusive spots-taken bounds."}]},
-  {name:"SpotsTakenBounds",kind:"input",file:"src/peek_app_utilities/models/peek/pricing.py",desc:"Bounds for a <code>SpotsTakenFilter</code>. <b>Zero-indexed spots-taken counts</b>, not ticket counts — \"from the 5th ticket onward\" is <code>SpotsTakenBounds(min_spots=4)</code>. Import from <code>peek_app_utilities.models.peek.pricing</code>.",
+  {name:"SpotsTakenBounds",kind:"input",file:"src/peek_app_utilities/models/peek/pricing.py",desc:"Bounds for a <code>SpotsTakenFilter</code>. <b>Zero-indexed spots-taken counts</b>, not ticket counts — \"from the 5th ticket onward\" is <code>SpotsTakenBounds(min_spots=4)</code>.",
    fields:[
     {name:"min_spots",type:"int | None",n:"opt",desc:"Lower bound (inclusive) on spots already taken; <code>None</code> for none."},
     {name:"max_spots",type:"int | None",n:"opt",desc:"Upper bound (inclusive) on spots already taken; <code>None</code> for none."}
    ]},
-  {name:"StartTimeRangeFilter",kind:"input",file:"src/peek_app_utilities/models/peek/pricing.py",desc:"Restricts an override to a start-time window. Import from <code>peek_app_utilities.models.peek.pricing</code>.",
+  {name:"StartTimeRangeFilter",kind:"input",file:"src/peek_app_utilities/models/peek/pricing.py",desc:"Restricts an override to a start-time window.",
    fields:[{name:"start_time_range",type:"str",n:false,desc:"PostgreSQL-style inclusive range string <code>\"[HH:MM:SS,HH:MM:SS]\"</code>."}]},
   {name:"PricingOverride",kind:"input",file:"src/peek_app_utilities/models/peek/pricing.py",desc:"A single override entry.",
    fields:[
@@ -802,12 +802,12 @@ render({
    ]},
   {name:"ResolvedOverride",kind:"union",file:"src/peek_app_utilities/models/peek/pricing.py",desc:"Read-back resolved override. Union on <code>mode</code>, normalized to the same <code>mode</code>-tagged shape used on input.",
    def:"ResolvedFixedOverride | ResolvedPercentageOverride"},
-  {name:"ResolvedFixedOverride",kind:"dataclass",file:"src/peek_app_utilities/models/peek/pricing.py",desc:"A ticket price override as resolved by Peek: a fixed replacement price. Import from <code>peek_app_utilities.models.peek.pricing</code>.",
+  {name:"ResolvedFixedOverride",kind:"dataclass",file:"src/peek_app_utilities/models/peek/pricing.py",desc:"A ticket price override as resolved by Peek: a fixed replacement price.",
    fields:[
     {name:"price",type:"PricingMoney",n:false,desc:"The resolved replacement price."},
     {name:"mode",type:'Literal["fixed"]',n:false,desc:"Discriminant: <code>\"fixed\"</code>."}
    ]},
-  {name:"ResolvedPercentageOverride",kind:"dataclass",file:"src/peek_app_utilities/models/peek/pricing.py",desc:"A ticket price override as resolved by Peek: a percentage adjustment. Import from <code>peek_app_utilities.models.peek.pricing</code>.",
+  {name:"ResolvedPercentageOverride",kind:"dataclass",file:"src/peek_app_utilities/models/peek/pricing.py",desc:"A ticket price override as resolved by Peek: a percentage adjustment.",
    fields:[
     {name:"percentage_adjustment",type:"str",n:false,desc:"The resolved percentage adjustment as a decimal string."},
     {name:"mode",type:'Literal["percentage"]',n:false,desc:"Discriminant: <code>\"percentage\"</code>."}
@@ -849,7 +849,7 @@ render({
     {name:"name",type:"str",n:false,desc:"Human-readable duration name (e.g. <code>1 hour</code>)."},
     {name:"length",type:"DurationLength",n:false,desc:"Numeric length + unit."}
    ]},
-  {name:"DurationLength",kind:"dataclass",file:"src/peek_app_utilities/models/peek/availability_time.py",desc:"The numeric length of a <code>Duration</code> paired with its unit. Import from <code>peek_app_utilities.models.peek.availability_time</code>.",
+  {name:"DurationLength",kind:"dataclass",file:"src/peek_app_utilities/models/peek/availability_time.py",desc:"The numeric length of a <code>Duration</code> paired with its unit.",
    fields:[
     {name:"amount",type:"int",n:false,desc:"Quantity of <code>unit</code> (e.g. <code>60</code>)."},
     {name:"unit",type:"str",n:false,desc:"Unit of <code>amount</code> (e.g. <code>minutes</code>)."}
@@ -916,7 +916,7 @@ render({
     {name:"value",type:"MetaDataValue | None",n:true,desc:"Typed response value, or <code>None</code> when absent or an unrecognized variant."}
    ]},
   {name:"MetaDataValue",kind:"union",file:"src/peek_app_utilities/models/peek/booking_metadata.py",
-   desc:"Discriminated union (keyed by <code>kind</code>) of a booking custom-field value — one frozen dataclass per Peek field-response variant; narrow with <code>match value: case MetaDataGuestValue(): …</code> or on <code>value.kind</code>. <code>Int</code> → <code>int</code>; <code>Decimal</code> → <code>str</code>; <code>Date</code>/<code>Time</code> → ISO string. The display-safe rendering lives on the parent <code>MetaData.display_value</code>, not on the variants. The variant classes are importable from <code>peek_app_utilities.models.peek.booking_metadata</code>.",
+   desc:"Discriminated union (keyed by <code>kind</code>) of a booking custom-field value — one frozen dataclass per Peek field-response variant; narrow with <code>match value: case MetaDataGuestValue(): …</code> or on <code>value.kind</code>. <code>Int</code> → <code>int</code>; <code>Decimal</code> → <code>str</code>; <code>Date</code>/<code>Time</code> → ISO string. The display-safe rendering lives on the parent <code>MetaData.display_value</code>, not on the variants.",
    def:"  MetaDataAgeValue | MetaDataAttachmentValue | MetaDataBarcodeValue | MetaDataBooleanValue\n| MetaDataCheckboxValue | MetaDataCurrencyValue | MetaDataDateValue | MetaDataDecimalValue\n| MetaDataDurationValue | MetaDataEmailValue | MetaDataGuestValue | MetaDataHtmlValue\n| MetaDataImageUrlValue | MetaDataIntegerValue | MetaDataLocationValue | MetaDataLongTextValue\n| MetaDataMetaValue | MetaDataPercentValue | MetaDataPhoneValue | MetaDataShortTextValue\n| MetaDataTimeValue | MetaDataUrlValue | MetaDataVolumeValue | MetaDataWeightValue"},
   {name:"MetaDataAgeValue",kind:"dataclass",file:"src/peek_app_utilities/models/peek/booking_metadata.py",desc:"<code>MetaDataValue</code> variant: an age.",
    fields:[{name:"kind",type:'Literal["age"]',n:false,desc:"Discriminant."},{name:"age",type:"int",n:false,desc:"Age in years."}]},
@@ -1173,7 +1173,7 @@ render({
     {name:"current_amount",type:"PaymentAmount",n:false,desc:"Current amount net of refunds."},
     {name:"refundable_amount",type:"PaymentAmount",n:false,desc:"Still-refundable amount."}
    ]},
-  {name:"PaymentAmount",kind:"dataclass",file:"src/peek_app_utilities/models/peek/booking_payment.py",desc:"A money amount on a <code>Payment</code>. Import from <code>peek_app_utilities.models.peek.booking_payment</code>.",
+  {name:"PaymentAmount",kind:"dataclass",file:"src/peek_app_utilities/models/peek/booking_payment.py",desc:"A money amount on a <code>Payment</code>.",
    fields:[
     {name:"amount",type:"str",n:false,desc:"Numeric amount as a string."},
     {name:"currency",type:"str",n:false,desc:"ISO currency code."}
