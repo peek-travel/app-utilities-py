@@ -82,7 +82,7 @@ def with_single_option(option: ResourceOptionOverride) -> UpsertOverridesInput:
     )
 
 
-def create_success():
+def create_success() -> dict[str, Any]:
     return {
         "createPricingEngine": {
             "__typename": "CreatePricingEngineSuccess",
@@ -91,7 +91,7 @@ def create_success():
     }
 
 
-def update_success():
+def update_success() -> dict[str, Any]:
     return {
         "updatePricingEngine": {
             "__typename": "UpdatePricingEngineSuccess",
@@ -219,7 +219,7 @@ async def test_delete_engine_resolves_on_success_and_sends_the_engine_id(gql):
         }
     )
 
-    assert await PricingService(gql).delete_engine("eng-1") is None
+    await PricingService(gql).delete_engine("eng-1")
     assert gql.calls[0].variables["id"] == "eng-1"
     assert "mutation DeletePricingEngine" in gql.calls[0].query
 
@@ -235,7 +235,8 @@ async def test_delete_engine_resolves_idempotent_when_the_engine_was_already_gon
         }
     )
 
-    assert await PricingService(gql).delete_engine("eng-1") is None
+    await PricingService(gql).delete_engine("eng-1")
+    assert len(gql.calls) == 1
 
 
 async def test_delete_engine_requires_an_engine_id(gql):
@@ -293,7 +294,11 @@ async def test_upsert_overrides_sends_both_spots_bounds_when_present(gql):
                         order=0,
                         resource_options=[],
                         filters=[
-                            SpotsTakenFilter(spots_taken=SpotsTakenBounds(min_spots=4, max_spots=9))
+                            SpotsTakenFilter(
+                                spots_taken=SpotsTakenBounds(min_spots=4, max_spots=9)
+                            ),
+                            SpotsTakenFilter(spots_taken=SpotsTakenBounds(max_spots=3)),
+                            SpotsTakenFilter(spots_taken=SpotsTakenBounds()),
                         ],
                     )
                 ],
@@ -304,7 +309,11 @@ async def test_upsert_overrides_sends_both_spots_bounds_when_present(gql):
     await PricingService(gql).upsert_overrides(input)
 
     sent = sent_input(gql)["activities"][0]["overrides"][0]["filters"]
-    assert sent == [{"spotsTaken": {"minSpots": 4, "maxSpots": 9}}]
+    assert sent == [
+        {"spotsTaken": {"minSpots": 4, "maxSpots": 9}},
+        {"spotsTaken": {"maxSpots": 3}},
+        {"spotsTaken": {}},
+    ]
 
 
 async def test_upsert_overrides_strips_a_caller_supplied_display_price_from_the_wire_input(gql):

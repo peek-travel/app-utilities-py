@@ -169,7 +169,7 @@ stay PII-agnostic; do not add PII branching to a converter.
 - **Reviews** (`build_reviews_query`): drops the reviewer `name`/`email`.
 - **Waivers** (`parse_waiver_webhook`): the webhook payload is fixed, so this is
   the **one** place filtering happens at parse time: participant `guest_name`
-  and the signed-document `file_url` are set to `None`.
+  becomes `None` and the signed-document `file_url` becomes `""`.
 
 **2. Payment / booking-modification operations are disabled.** `BookingService`
 gates `get_payments_on_file`, `make_payment`, `refund`, `create_invoice_link`,

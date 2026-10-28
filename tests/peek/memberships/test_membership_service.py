@@ -130,11 +130,11 @@ async def test_purchase_omits_blank_optional_member_fields(gql):
         MembershipPurchaseInput(
             membership_variant_id="mv-1",
             email="ada@example.com",
-            country="  ",
+            country=None,
             formatted_address="",
             membership_code=" ",
-            name="",
-            phone="   ",
+            name="  ",
+            phone=None,
         )
     )
 
