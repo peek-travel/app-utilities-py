@@ -80,12 +80,20 @@ module = ["tests.*"]
 disallow_untyped_defs = false
 disallow_incomplete_defs = false
 check_untyped_defs = true
+# Tests splat option dicts and poke at fakes; keep them loosely typed.
+disable_error_code = ["arg-type", "union-attr", "type-arg", "unreachable", "attr-defined"]
+warn_unused_ignores = false
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 testpaths = ["tests"]
 addopts = "-q"
+filterwarnings = [
+  "error",
+  # Tests sign with short throwaway secrets on purpose.
+  "ignore::jwt.warnings.InsecureKeyLengthWarning",
+]
 
 [tool.coverage.run]
 source = ["peek_app_utilities"]

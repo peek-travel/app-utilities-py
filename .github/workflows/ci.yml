@@ -1,0 +1,31 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - name: Install
+        run: uv sync --python ${{ matrix.python-version }} --group dev
+      - name: Lint
+        run: uv run ruff check . && uv run ruff format --check .
+      - name: Type-check
+        run: uv run mypy
+      - name: Test (95% coverage gate)
+        run: uv run pytest --cov --cov-report=term-missing --cov-report=xml
+      - name: Harness compiles
+        run: uv run python -m py_compile scripts/gql_cli/cli.py
+      - name: Build
+        run: uv build
