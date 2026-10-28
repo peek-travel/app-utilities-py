@@ -53,6 +53,8 @@ happens.
 | `number` meaning cents/count/integer id | `int` |
 | `number` meaning rating/percentage/decimal | `float` |
 | `Decimal` kept as string in TS | `str` (no float loss) |
+| `Date \| null` (parsed timestamp) | `datetime \| None` via `datetime.fromisoformat`; an unparseable string degrades to `None` (TS yields `Invalid Date`) |
+| ISO date/time **string** fields | stay `str` (the TS keeps them as strings too) |
 | `"a" \| "b"` union alias | `Literal["a", "b"]` alias **plus** a `Final` tuple constant when runtime code checks membership (see `PEEK_PLATFORMS`) |
 | discriminated union (`kind: "x"` variants) | one dataclass per variant with `kind: Literal["x"]`, and a `Union` alias |
 | `Record<string, unknown>` / `unknown` payload | `Mapping[str, Any]` / `Any` |
@@ -95,7 +97,8 @@ carried over:
 
 - the top-level short-form proxies on the access services (`peek.getAllProducts()`
   etc.) — callers use `peek.get_product_service().get_all_products()`;
-- `verifyInstallWebhook` (superseded by `parse_install_webhook`).
+- `verifyInstallWebhook` (superseded by `parse_install_webhook`);
+- the `AddAddonInput.addonId` alias (use `addon_option_id`).
 
 The deprecated-but-functional config fields `app_id` / `base_url` / `mode`
 **are** ported, because they still select the legacy v1 gateway route.
