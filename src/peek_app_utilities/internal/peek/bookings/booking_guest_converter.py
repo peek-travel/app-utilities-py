@@ -21,7 +21,9 @@ def from_booking_guests_response(response: Mapping[str, Any] | None) -> list[Gue
     booking_node: Mapping[str, Any] = (edges[0] or {}).get("node") or {}
     primary_guest_node = booking_node.get("primaryGuest")
     raw_guests = booking_node.get("bookingGuests")
-    booking_guest_nodes: list[Mapping[str, Any]] = raw_guests if isinstance(raw_guests, list) else []
+    booking_guest_nodes: list[Mapping[str, Any]] = (
+        raw_guests if isinstance(raw_guests, list) else []
+    )
     primary_id = (primary_guest_node or {}).get("id")
 
     guests = [

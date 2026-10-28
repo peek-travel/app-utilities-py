@@ -130,7 +130,9 @@ def to_booking_addon(item: AddonItem) -> BookingAddon | None:
         counts[opt.option_id] = counts.get(opt.option_id, 0) + 1
 
     addon_options = [
-        BookingAddonOption(addon_option_id=option_id, addon_option_name=names[option_id], quantity=count)
+        BookingAddonOption(
+            addon_option_id=option_id, addon_option_name=names[option_id], quantity=count
+        )
         for option_id, count in counts.items()
     ]
     if not addon_options:

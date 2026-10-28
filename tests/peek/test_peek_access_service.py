@@ -66,7 +66,14 @@ def empty_products_client() -> tuple[httpx.AsyncClient, list[httpx.Request]]:
             return json_response(200, {"data": {"activities": []}})
         return json_response(
             200,
-            {"data": {"itemOptions": {"edges": [], "pageInfo": {"hasNextPage": False, "endCursor": None}}}},
+            {
+                "data": {
+                    "itemOptions": {
+                        "edges": [],
+                        "pageInfo": {"hasNextPage": False, "endCursor": None},
+                    }
+                }
+            },
         )
 
     return mock_http_client(handler), calls
@@ -101,7 +108,11 @@ def test_raises_when_a_required_v1_field_is_missing(field: str):
 def test_does_not_require_gateway_key_in_v2_mode():
     PeekAccessService(
         PeekAccessServiceConfig(
-            install_id="install-1", jwt_secret="secret", issuer="Peek Test", app_id="app-1", mode="v2"
+            install_id="install-1",
+            jwt_secret="secret",
+            issuer="Peek Test",
+            app_id="app-1",
+            mode="v2",
         )
     )
 
@@ -258,9 +269,11 @@ def test_normalizes_a_sentinel_id_to_none_without_raising(sentinel: str):
 
 def test_maps_a_user_block_that_omits_id_keeping_the_other_fields():
     user_without_id = {k: v for k, v in SAMPLE_USER.items() if k != "id"}
-    user = PeekAccessService(config()).verify_peek_auth_token(
-        mint("secret", {"user": user_without_id})
-    ).user
+    user = (
+        PeekAccessService(config())
+        .verify_peek_auth_token(mint("secret", {"user": user_without_id}))
+        .user
+    )
     assert user.id is None
     assert user.email == "admin@peek.com"
     assert user.is_admin is False
@@ -297,7 +310,11 @@ async def test_v2_uses_the_app_registry_base_url_by_default():
 async def test_v2_inserts_the_slug_with_a_custom_base_url():
     client, calls = empty_products_client()
     peek = PeekAccessService(
-        config(mode="v2", http_client=client, base_url="https://app-registry.prod.peeklabs.com/installations-api")
+        config(
+            mode="v2",
+            http_client=client,
+            base_url="https://app-registry.prod.peeklabs.com/installations-api",
+        )
     )
     await peek.get_product_service().get_all_products()
     assert str(calls[0].url) == (
@@ -317,7 +334,11 @@ async def test_v2_still_mints_and_sends_a_bearer_token():
 
 def api_url_config(api_url: str, **overrides: Any) -> PeekAccessServiceConfig:
     return PeekAccessServiceConfig(
-        install_id="install-1", jwt_secret="secret", issuer="Peek Test", api_url=api_url, **overrides
+        install_id="install-1",
+        jwt_secret="secret",
+        issuer="Peek Test",
+        api_url=api_url,
+        **overrides,
     )
 
 
@@ -343,7 +364,9 @@ def test_api_url_needs_neither_app_id_nor_gateway_key():
 async def test_api_url_takes_precedence_over_base_url_and_mode():
     client, calls = empty_products_client()
     peek = PeekAccessService(
-        config(mode="v2", base_url="https://ignored.example/gql", api_url=API_URL, http_client=client)
+        config(
+            mode="v2", base_url="https://ignored.example/gql", api_url=API_URL, http_client=client
+        )
     )
     await peek.get_product_service().get_all_products()
     assert str(calls[0].url) == RESOLVED_URL

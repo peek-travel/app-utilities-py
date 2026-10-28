@@ -137,7 +137,9 @@ returns `None` where a caller expected a guest name. Treat it as load-bearing.
 field. Today it carries a single flag:
 
 ```python
-PeekAccessService(PeekAccessServiceConfig(..., access_options=AccessOptions(full_customer_access=True)))
+PeekAccessService(
+    PeekAccessServiceConfig(..., access_options=AccessOptions(full_customer_access=True))
+)
 ```
 
 - **Default is `False`** — PII off. Omitting `access_options`, passing

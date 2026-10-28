@@ -124,7 +124,9 @@ def _attachment(v: RawNode) -> ValueAndDisplay:
 def _barcode(v: RawNode) -> ValueAndDisplay:
     barcode_value = _or(v.get("barcodeValue"), "")
     barcode_type = cast("MetaDataBarcodeType | None", v.get("barcodeType"))
-    return MetaDataBarcodeValue(barcode_type=barcode_type, barcode_value=barcode_value), barcode_value
+    return MetaDataBarcodeValue(
+        barcode_type=barcode_type, barcode_value=barcode_value
+    ), barcode_value
 
 
 def _boolean(v: RawNode) -> ValueAndDisplay:
@@ -208,7 +210,9 @@ def _location(v: RawNode) -> ValueAndDisplay:
             region=region,
             street_address=street_address,
         ),
-        ", ".join(part for part in (street_address, locality, region, postal_code, country) if part),
+        ", ".join(
+            part for part in (street_address, locality, region, postal_code, country) if part
+        ),
     )
 
 

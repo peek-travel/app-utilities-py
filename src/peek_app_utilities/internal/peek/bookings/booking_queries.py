@@ -269,8 +269,9 @@ def build_bookings_listing_query(
     # replace) must go in afterwards, or it would capture that anchor instead.
     base_fields = build_booking_query_fields(full_customer_access)
     fields = (
-        base_fields.replace(VALUE_OPEN_TOKEN, f"{VALUE_OPEN_TOKEN} {PRICE_BREAKDOWN_FIELDS}", 1)
-        .replace(
+        base_fields.replace(
+            VALUE_OPEN_TOKEN, f"{VALUE_OPEN_TOKEN} {PRICE_BREAKDOWN_FIELDS}", 1
+        ).replace(
             _TICKET_QUANTITIES_OPEN_TOKEN,
             f"{_TICKET_QUANTITIES_OPEN_TOKEN} {TICKET_VALUE_FIELDS}",
             1,

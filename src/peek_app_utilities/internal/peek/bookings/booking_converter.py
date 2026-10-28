@@ -163,7 +163,9 @@ def from_booking_node(
         value_amount=value_total.get("amount") or "",
         outstanding_balance_amount=balance_total.get("amount") or "",
         outstanding_balance_display=balance_total.get("formatted") or "",
-        promo_codes=[_text(_mapping(promo).get("code")) for promo in _sequence(order.get("promoCodes"))],
+        promo_codes=[
+            _text(_mapping(promo).get("code")) for promo in _sequence(order.get("promoCodes"))
+        ],
         tips=[
             Price(
                 display=_dig(tip, "price").get("formatted") or "",
@@ -185,7 +187,9 @@ def from_booking_node(
         reseller_id=_mapping(channel_snapshot).get("id") or None,
         reseller_name=_reseller_name_from_channel_snapshot(channel_snapshot),
         order_id=order.get("id") or "",
-        peek_pro_booking_deep_link=_build_peek_pro_booking_deep_link(order.get("id"), data.get("id")),
+        peek_pro_booking_deep_link=_build_peek_pro_booking_deep_link(
+            order.get("id"), data.get("id")
+        ),
         convenience_fee=breakdown("convenienceFee"),
         deposit=breakdown("deposit"),
         discount=breakdown("discount"),
@@ -386,4 +390,6 @@ def _map_price(price_data: Any) -> Price | None:
     price = _mapping(price_data)
     if not price.get("amount") and not price.get("formatted"):
         return None
-    return Price(amount=price.get("amount") or _DEFAULT_PRICE_AMOUNT, display=price.get("formatted") or "")
+    return Price(
+        amount=price.get("amount") or _DEFAULT_PRICE_AMOUNT, display=price.get("formatted") or ""
+    )
