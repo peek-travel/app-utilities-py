@@ -409,6 +409,8 @@ install webhook delivers a signed token alongside a JSON body, so its helper
 but the parsers only need the raw body (a mapping or a JSON string):
 
 ```python
+import os
+
 import jwt
 from fastapi import FastAPI, Header, Request, Response
 

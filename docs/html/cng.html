@@ -1,0 +1,408 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Reference — peek-app-utilities</title>
+<script>(function(){try{var u=new URLSearchParams(location.search).get("theme");var s=u||localStorage.getItem("theme");var t=(s==="light"||s==="dark")?s:"light";document.documentElement.setAttribute("data-theme",t);if(u==="light"||u==="dark"){try{localStorage.setItem("theme",u);}catch(e){}}}catch(e){}})();</script>
+<style>
+  :root{
+    --bg:#0d1117; --panel:#161b22; --panel2:#1c2330; --border:#2a3441;
+    --text:#e6edf3; --muted:#8b949e; --accent:#58a6ff; --accent2:#3fb950;
+    --type:#79c0ff; --null:#f0883e; --danger:#f85149; --pii:#d2a8ff;
+    --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+    --c-com:#8b949e; --c-str:#a5d6ff; --c-num:#79c0ff; --c-kw:#ff7b72; --c-lit:#79c0ff; --c-con:#79c0ff; --c-cls:#ffa657; --c-fn:#d2a8ff;
+  }
+  html[data-theme="light"]{
+    --bg:#f6f8fa; --panel:#ffffff; --panel2:#eef1f5; --border:#d0d7de;
+    --text:#1f2328; --muted:#59636e; --accent:#0969da; --accent2:#1a7f37;
+    --type:#0550ae; --null:#bc4c00; --danger:#cf222e; --pii:#8250df;
+    --c-com:#6e7781; --c-str:#0a3069; --c-num:#0550ae; --c-kw:#cf222e; --c-lit:#0550ae; --c-con:#0550ae; --c-cls:#953800; --c-fn:#8250df;
+  }
+  html[data-theme="light"] .desc,
+  html[data-theme="light"] .ctor,
+  html[data-theme="light"] .notes li,
+  html[data-theme="light"] .sig,
+  html[data-theme="light"] .example{color:#24292f}
+  html[data-theme="light"] .badge.opt{background:#eaeef2;color:#59636e}
+  html[data-theme="light"] ::-webkit-scrollbar-thumb{background:#d0d7de;border-color:#f6f8fa}
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{background:var(--bg);color:var(--text);font:14px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;display:flex}
+  a{color:var(--accent);text-decoration:none}
+  code,.mono{font-family:var(--mono)}
+  /* sidebar */
+  #sidebar{width:300px;min-width:300px;height:100vh;overflow-y:auto;background:var(--panel);border-right:1px solid var(--border);position:sticky;top:0;padding:0 0 40px}
+  #brand{padding:18px 20px 12px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--panel);z-index:2}
+  #brand h1{margin:0;font-size:16px;letter-spacing:.3px}
+  #brand .tag{display:inline-block;margin-top:6px;font-size:11px;color:var(--bg);background:var(--accent2);padding:2px 8px;border-radius:10px;font-weight:600}
+  .pkgbadge{display:inline-block;margin:6px 0 0 6px;font-size:11px;color:var(--muted);border:1px solid var(--border);border-radius:10px;padding:2px 8px;font-family:var(--mono)}
+  #brand .links{margin-top:10px;font-size:12px;display:flex;gap:12px}
+  .themebtn{margin-left:auto;background:var(--panel2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:2px 9px;cursor:pointer;font-size:13px;line-height:1.4}
+  .themebtn:hover{border-color:var(--accent);color:var(--accent)}
+  #search{width:100%;margin-top:12px;padding:8px 10px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px}
+  .navgroup{padding:14px 12px 4px 20px;font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted)}
+  .navitem{display:block;padding:5px 20px 5px 24px;color:var(--text);font-size:13px;border-left:2px solid transparent;cursor:pointer}
+  .navitem:hover{background:var(--panel2)}
+  .navitem.active{border-left-color:var(--accent);background:var(--panel2);color:var(--accent)}
+  .navitem .k{font-family:var(--mono);font-size:12px}
+  /* main */
+  #main{flex:1;min-width:0;height:100vh;overflow-y:auto;padding:0 48px 120px}
+  #hero{padding:40px 0 20px;border-bottom:1px solid var(--border);margin-bottom:8px}
+  #hero h2{margin:0 0 8px;font-size:28px}
+  #hero p{color:var(--muted);max-width:820px;margin:6px 0}
+  section.card{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:22px 24px;margin:26px 0;scroll-margin-top:20px}
+  section.card h3{margin:0 0 4px;font-size:20px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .pill{font-size:11px;padding:2px 8px;border-radius:10px;font-weight:600}
+  .pill.svc{background:#1f6feb33;color:var(--accent);border:1px solid #1f6feb55}
+  .pill.model{background:#3fb95033;color:var(--accent2);border:1px solid #3fb95055}
+  .pill.pii{background:#8957e533;color:var(--pii);border:1px solid #8957e555}
+  .file{font-family:var(--mono);font-size:12px;color:var(--muted);margin:2px 0 12px}
+  .desc{color:#c9d1d9;margin:8px 0 14px;max-width:900px}
+  .ctor{font-family:var(--mono);font-size:12.5px;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:10px 12px;overflow-x:auto;margin:6px 0 14px;color:#c9d1d9;white-space:pre-wrap}
+  .example{font-family:var(--mono);font-size:12.5px;line-height:1.55;white-space:pre;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:12px 14px;overflow-x:auto;margin:6px 0 14px;color:#c9d1d9}
+  .example .t-com{color:var(--c-com);font-style:italic}
+  .example .t-str{color:var(--c-str)}
+  .example .t-num{color:var(--c-num)}
+  .example .t-kw{color:var(--c-kw)}
+  .example .t-lit{color:var(--c-lit)}
+  .example .t-con{color:var(--c-con)}
+  .example .t-cls{color:var(--c-cls)}
+  .example .t-fn{color:var(--c-fn)}
+  .notes{list-style:none;padding:0;margin:6px 0 12px}
+  .notes li{padding:6px 10px 6px 28px;position:relative;background:var(--panel2);border:1px solid var(--border);border-radius:6px;margin:5px 0;font-size:12.5px;color:#c9d1d9}
+  .notes li:before{content:"›";position:absolute;left:11px;color:var(--accent);font-weight:700}
+  table{width:100%;border-collapse:collapse;margin:8px 0 4px;font-size:13px}
+  th{text-align:left;padding:8px 10px;border-bottom:2px solid var(--border);color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.5px;font-weight:600}
+  td{padding:8px 10px;border-bottom:1px solid var(--border);vertical-align:top}
+  tr:last-child td{border-bottom:none}
+  tr:hover td{background:var(--panel2)}
+  .m-name{font-family:var(--mono);color:var(--accent);white-space:nowrap;font-weight:600}
+  .sig{font-family:var(--mono);color:#c9d1d9;font-size:12px}
+  .type{font-family:var(--mono);color:var(--type);font-size:12.5px}
+  a.mlink{color:var(--accent);text-decoration:none;border-bottom:1px dashed #58a6ff66;cursor:pointer}
+  a.mlink:hover{border-bottom-style:solid;color:#79c0ff}
+  .type a.mlink{color:var(--type);border-bottom-color:#79c0ff66}
+  .null-y{color:var(--null);font-weight:600}
+  .null-n{color:var(--muted)}
+  .subhead{margin:20px 0 4px;font-size:13px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted)}
+  .hidden{display:none !important}
+  .fieldname{font-family:var(--mono);font-weight:600}
+  .badge{display:inline-block;font-size:10px;padding:1px 6px;border-radius:8px;margin-left:6px;vertical-align:middle}
+  .badge.opt{background:#30363d;color:var(--muted)}
+  .badge.inh{background:#1f6feb22;color:var(--muted);border:1px solid var(--border);font-weight:500}
+  .extends{font-family:var(--mono);font-size:12.5px;color:var(--muted);margin:-4px 0 12px}
+  tr.inh-row .fieldname{opacity:.92}
+  .empty{color:var(--muted);font-style:italic;padding:12px 0}
+  ::-webkit-scrollbar{width:11px;height:11px}
+  ::-webkit-scrollbar-thumb{background:#30363d;border-radius:6px;border:2px solid var(--bg)}
+</style>
+</head>
+<body>
+<nav id="sidebar">
+  <div id="brand">
+    <h1>CNG Platform</h1>
+    <span class="tag">peek-app-utilities</span>
+    <span class="pkgbadge">Python · PyPI package</span>
+    <div class="links">
+      <a href="../index.html">← Home</a>
+      <button id="themeBtn" class="themebtn" title="Toggle light/dark" aria-label="Toggle theme">◐</button>
+    </div>
+    <input id="search" placeholder="Filter services & models…" autocomplete="off"/>
+  </div>
+  <div id="nav"></div>
+</nav>
+<main id="main">
+  <div id="hero">
+    <h2 id="heroTitle"></h2>
+    <p id="heroSub"></p>
+  </div>
+  <div id="content"></div>
+</main>
+<script>
+/* ---------- shared renderer ---------- */
+function nullCell(n){return n===true?'<span class="null-y">nullable</span>':n==="opt"?'<span class="null-y">optional</span>':'<span class="null-n">—</span>';}
+function el(tag,cls,html){const e=document.createElement(tag);if(cls)e.className=cls;if(html!=null)e.innerHTML=html;return e;}
+function slug(s){return s.replace(/[^a-zA-Z0-9]+/g,'-');}
+let LINK_RE=null,LINK_MAP=null;
+function linkify(str){
+  if(!str||!LINK_RE)return str;
+  return str.replace(LINK_RE,m=>'<a class="mlink" href="#'+LINK_MAP[m]+'">'+m+'</a>');
+}
+
+function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function highlight(code){
+  var pats=[
+    ['com',/#[^\n]*/],
+    ['str',/"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'/],
+    ['num',/\b\d[\d_]*(?:\.\d+)?\b/],
+    ['kw',/\b(?:import|from|as|async|await|def|return|if|elif|else|for|in|with|class|lambda|not|and|or|is|raise|try|except|finally|pass|yield|while|del|assert)\b/],
+    ['lit',/\b(?:True|False|None|self|cls)\b/],
+    ['con',/\b[A-Z][A-Z0-9_]+\b/],
+    ['cls',/\b[A-Z][\w$]*\b/],
+    ['fn',/[A-Za-z_$][\w$]*(?=\s*\()/],
+    ['id',/[A-Za-z_$][\w$]*/],
+    ['pun',/[{}()\[\].;,:=<>|&?!+\-*\/]/],
+    ['ws',/\s+/],
+    ['any',/[\s\S]/]
+  ];
+  var master=new RegExp(pats.map(function(p){return '('+p[1].source+')';}).join('|'),'g');
+  var out='';
+  code.replace(master,function(m){
+    var g=Array.prototype.slice.call(arguments,1,1+pats.length);
+    var i=g.findIndex(function(x){return x!==undefined;});
+    var cls=pats[i][0];
+    if(cls==='ws') out+=m;
+    else if(cls==='id'||cls==='pun'||cls==='any') out+=esc(m);
+    else out+='<span class="t-'+cls+'">'+esc(m)+'</span>';
+    return m;
+  });
+  return out;
+}
+
+function render(DATA){
+  document.title = DATA.title+" Platform — peek-app-utilities";
+  heroTitle.textContent = DATA.hero;
+  heroSub.innerHTML = DATA.heroSub;
+  // sort: root *AccessService first, other services A–Z; models A–Z;
+  // methods within each service A–Z
+  DATA.services.sort((a,b)=>{
+    const ra=/AccessService$/.test(a.name), rb=/AccessService$/.test(b.name);
+    if(ra!==rb)return ra?-1:1;
+    return a.name.localeCompare(b.name);
+  });
+  DATA.services.forEach(s=>{if(s.methods)s.methods.sort((a,b)=>a.name.localeCompare(b.name));});
+  DATA.models.sort((a,b)=>a.name.localeCompare(b.name));
+  LINK_MAP={};
+  DATA.models.forEach(m=>{LINK_MAP[m.name]='mdl-'+slug(m.name);});
+  DATA.services.forEach(x=>{LINK_MAP[x.name]='svc-'+slug(x.name);});
+  const _names=Object.keys(LINK_MAP).sort((a,b)=>b.length-a.length);
+  LINK_RE=new RegExp('\\b('+_names.join('|')+')\\b','g');
+  const nav=document.getElementById('nav'), content=document.getElementById('content');
+
+  const _isAccess=s=>/AccessService$/.test(s.name);
+  const _access=DATA.services.filter(_isAccess), _rest=DATA.services.filter(s=>!_isAccess(s));
+  function _navSvc(s){const a=el('a','navitem');a.dataset.target='svc-'+slug(s.name);a.innerHTML='<span class="k">'+s.name+'</span>';nav.appendChild(a);}
+  if(_access.length){nav.appendChild(el('div','navgroup','Access Service'));_access.forEach(_navSvc);}
+  if(_rest.length){nav.appendChild(el('div','navgroup','Service Classes'));_rest.forEach(_navSvc);}
+  nav.appendChild(el('div','navgroup','Data Models'));
+  DATA.models.forEach(m=>{
+    const a=el('a','navitem');a.dataset.target='mdl-'+slug(m.name);
+    a.innerHTML='<span class="k">'+m.name+'</span>';nav.appendChild(a);
+  });
+
+  // services
+  DATA.services.forEach(s=>{
+    const c=el('section','card');c.id='svc-'+slug(s.name);c.dataset.search=(s.name+' '+s.desc).toLowerCase();
+    let h='<h3>'+s.name+' <span class="pill svc">service</span></h3>';
+    h+='<div class="file">'+s.file+'</div>';
+    if(s.desc)h+='<div class="desc">'+s.desc+'</div>';
+    if(s.ctor)h+='<div class="subhead">Constructor</div><div class="ctor">'+linkify(s.ctor)+'</div>';
+    if(s.obtain)h+='<div class="subhead">Obtain</div><div class="ctor">'+linkify(s.obtain)+'</div>';
+    if(s.notes&&s.notes.length){h+='<div class="subhead">Behavior</div><ul class="notes">'+s.notes.map(n=>'<li>'+n+'</li>').join('')+'</ul>';}
+    if(s.example)h+='<div class="subhead">Example</div><pre class="example">'+highlight(s.example)+'</pre>';
+    if(s.methods&&s.methods.length){
+      h+='<div class="subhead">Methods</div><table><thead><tr><th>Method</th><th>Signature</th><th>Description</th></tr></thead><tbody>';
+      s.methods.forEach(m=>{
+        let notes=m.notes?'<div style="margin-top:6px;color:var(--muted);font-size:12px">'+m.notes+'</div>':'';
+        let pii=m.pii?' <span class="pill pii">PII-gated</span>':'';
+        h+='<tr><td class="m-name">'+m.name+pii+'</td><td class="sig">'+linkify(m.sig)+'</td><td>'+m.desc+notes+'</td></tr>';
+      });
+      h+='</tbody></table>';
+    }
+    c.innerHTML=h;content.appendChild(c);
+  });
+
+  // models
+  const MBN={}; DATA.models.forEach(m=>{MBN[m.name]=m;});
+  function resolveFields(m){
+    const rows=(m.fields||[]).map(f=>({f,from:null}));
+    const seen=new Set([m.name]); let pn=m.extends;
+    while(pn && !seen.has(pn)){seen.add(pn);const p=MBN[pn];if(!p)break;(p.fields||[]).forEach(f=>rows.push({f,from:p.name}));pn=p.extends;}
+    return rows;
+  }
+  DATA.models.forEach(m=>{
+    const c=el('section','card');c.id='mdl-'+slug(m.name);c.dataset.search=(m.name+' '+(m.desc||'')+' '+(m.extends||'')).toLowerCase();
+    let h='<h3>'+m.name+' <span class="pill model">'+(m.kind||'model')+'</span></h3>';
+    if(m.file)h+='<div class="file">'+m.file+'</div>';
+    if(m.desc)h+='<div class="desc">'+m.desc+'</div>';
+    if(m.extends)h+='<div class="extends">Extends '+linkify(m.extends)+'</div>';
+    if(m.def)h+='<div class="ctor">'+linkify(m.def)+'</div>';
+    const rows=resolveFields(m);
+    if(rows.length){
+      h+='<table><thead><tr><th>Field</th><th>Type</th><th>Nullability</th><th>Description</th></tr></thead><tbody>';
+      rows.forEach(r=>{
+        const f=r.f;
+        const inh=r.from?' <span class="badge inh">inherited from '+linkify(r.from)+'</span>':'';
+        h+='<tr'+(r.from?' class="inh-row"':'')+'><td class="fieldname">'+f.name+inh+'</td><td class="type">'+linkify(f.type)+'</td><td>'+nullCell(f.n)+'</td><td>'+f.desc+'</td></tr>';
+      });
+      h+='</tbody></table>';
+    }
+    c.innerHTML=h;content.appendChild(c);
+  });
+
+  // nav interactions
+  const items=[...document.querySelectorAll('.navitem')];
+  items.forEach(a=>a.addEventListener('click',()=>{
+    const t=document.getElementById(a.dataset.target);
+    if(t)t.scrollIntoView({behavior:'smooth',block:'start'});
+  }));
+  const cards=[...document.querySelectorAll('section.card')];
+  const io=new IntersectionObserver(es=>{
+    es.forEach(e=>{if(e.isIntersecting){
+      const id=e.target.id;items.forEach(a=>a.classList.toggle('active',a.dataset.target===id));
+    }});
+  },{rootMargin:'-10% 0px -80% 0px'});
+  cards.forEach(c=>io.observe(c));
+
+  // model cross-links
+  document.addEventListener('click',ev=>{
+    const a=ev.target.closest&&ev.target.closest('.mlink');if(!a)return;
+    ev.preventDefault();
+    const t=document.getElementById(a.getAttribute('href').slice(1));
+    if(t){const sb=document.getElementById('search');if(sb&&sb.value){sb.value='';sb.dispatchEvent(new Event('input'));}
+      t.scrollIntoView({behavior:'smooth',block:'start'});}
+  });
+
+  // theme toggle (+ carry the choice across the sibling pages via ?theme=,
+  // since file:// localStorage is isolated per page in some browsers)
+  function _syncThemeLinks(t){
+    document.querySelectorAll('#brand .links a').forEach(a=>{
+      a.setAttribute('href', a.getAttribute('href').split('?')[0]+'?theme='+t);
+    });
+  }
+  _syncThemeLinks(document.documentElement.getAttribute('data-theme')||'light');
+  const _tb=document.getElementById('themeBtn');
+  if(_tb)_tb.addEventListener('click',()=>{
+    const cur=document.documentElement.getAttribute('data-theme')==='light'?'dark':'light';
+    document.documentElement.setAttribute('data-theme',cur);
+    try{localStorage.setItem('theme',cur);}catch(e){}
+    _syncThemeLinks(cur);
+  });
+
+  // search
+  document.getElementById('search').addEventListener('input',ev=>{
+    const q=ev.target.value.trim().toLowerCase();
+    cards.forEach(c=>{
+      const show=!q||c.dataset.search.includes(q);
+      c.classList.toggle('hidden',!show);
+      const a=document.querySelector('.navitem[data-target="'+c.id+'"]');
+      if(a)a.classList.toggle('hidden',!show);
+    });
+  });
+}
+</script>
+
+<script>
+/* ---------- CNG DATA ---------- */
+render({
+ title:"CNG",
+ hero:"CNG Platform",
+ heroSub:"Sibling of the Peek accessor. Reuses the shared app-JWT auth, retry/backoff, <code>Logger</code>, and base error types. Consumers construct one <code>CngAccessService</code> per install and <code>await</code> typed methods returning clean frozen dataclasses. Public exports: <code>CngAccessService</code>, <code>CngAccessServiceConfig</code>, <code>CngProductService</code>, <code>Activity</code>, <code>ActivityTicket</code>, <code>CngApiError</code>, <code>CngPermissionError</code>.",
+ services:[
+  {
+   name:"CngAccessService",
+   file:"src/peek_app_utilities/cng_access_service.py",
+   desc:"Authenticated root entry point. The CNG sibling of <code>PeekAccessService</code>. Configure one instance per install with a <code>CngAccessServiceConfig</code>; it owns the shared authenticated client (minting and caching the app JWT on demand) and hands out the <code>CngProductService</code>. Supports <code>async with</code>, which closes the package-owned HTTP client on exit.",
+   ctor:"CngAccessService(config: CngAccessServiceConfig)",
+   example:"import os\nfrom peek_app_utilities import CngAccessService, CngAccessServiceConfig\n\nasync with CngAccessService(CngAccessServiceConfig(\n    install_id=\"install_123\",  # from verify_peek_auth_token(token).install_id\n    jwt_secret=os.environ[\"APP_SECRET\"],\n    issuer=\"my-app\",\n    api_url=\"https://apps.peek.com/installations-api/my-app\",  # from the install webhook\n)) as cng:\n    # every activity as one flat list\n    activities = await cng.get_product_service().get_all_activities()",
+   notes:[
+     "<code>CngAccessServiceConfig</code> is an alias of <code>BaseAccessServiceConfig</code> — CNG adds no fields (it authenticates on the app JWT alone, no <code>gateway_key</code>).",
+     "Raises <code>ValueError</code> (<code>CngAccessService: \"&lt;field&gt;\" is required</code>) from the constructor when <code>install_id</code>, <code>jwt_secret</code> or <code>issuer</code> is empty.",
+     "<code>app_id</code> is required (non-empty) only when <code>api_url</code> is not set (legacy <code>base_url</code> mode).",
+     "When <code>api_url</code> is present it is the base API URL; the product service appends the <code>cng_backoffice_api-v1</code> slug and the request path. A slug already on the URL (dashes or underscores) is stripped back to the base; a different platform's slug makes the constructor raise <code>ValueError</code>. Otherwise <code>base_url</code> defaults to the app-registry installations API and the base is <code>&lt;base_url&gt;/&lt;app_id&gt;</code>."
+   ],
+   methods:[
+     {name:"get_product_service",sig:"def get_product_service(self) -&gt; CngProductService",desc:"Returns the product service for this install, bound to the shared authenticated client.",notes:"Lazily created and memoized — repeated calls return the same instance."},
+     {name:"aclose",sig:"async def aclose(self) -&gt; None",desc:"Closes the package-owned HTTP client. A caller-supplied <code>http_client</code> is left open.",notes:"Called automatically on <code>async with</code> exit."},
+     {name:"__aenter__ / __aexit__",sig:"async with CngAccessService(config) as cng: …",desc:"Async context-manager support: enters with the service itself and calls <code>aclose()</code> on exit."}
+   ]
+  },
+  {
+   name:"CngProductService",
+   file:"src/peek_app_utilities/internal/cng/products/product_service.py",
+   desc:"Product operations against the CNG platform. Named <code>CngProductService</code> to disambiguate from the Peek <code>ProductService</code>.",
+   obtain:"CngAccessService.get_product_service()",
+   methods:[
+     {name:"get_all_activities",sig:"async def get_all_activities(self) -&gt; list[Activity]",desc:"Returns every activity as a single flat list.",notes:"Fetches the account's active products and maps each to an <code>Activity</code>. Defensive: an empty or absent payload yields <code>[]</code>. The active-only filter is applied by the platform, so inactive/archived products never reach the package."}
+   ]
+  }
+ ],
+ models:[
+  {name:"AccessOptions",kind:"input",file:"src/peek_app_utilities/access_options.py",
+   desc:"Cross-cutting access options passed once at construction via the config's <code>access_options</code> field. Governs customer-PII exposure. Inert for CNG today (it reads no customer data), but accepted for parity with the Peek accessor.",
+   fields:[{name:"full_customer_access",type:"bool | None",n:"opt",desc:"Expose customer PII and enable payment/modification ops (default <code>False</code>)."}]},
+  {name:"Logger",kind:"protocol",file:"src/peek_app_utilities/logger.py",
+   desc:"Optional structured logger passed via the config's <code>logger</code> field — any object with these three methods satisfies it. <code>noop_logger</code> (a silent implementation) is the exported default; <code>logging_adapter(logger: logging.Logger)</code> wraps a standard-library logger (the context mapping goes out as <code>extra={\"context\": {…}}</code>).",
+   fields:[
+    {name:"info",type:"(message: str, context: Mapping[str, Any] | None = None) -&gt; None",n:false,desc:"Informational log."},
+    {name:"warn",type:"(message: str, context: Mapping[str, Any] | None = None) -&gt; None",n:false,desc:"Warning log."},
+    {name:"error",type:"(message: str, context: Mapping[str, Any] | None = None) -&gt; None",n:false,desc:"Error log."}
+   ]},
+  {name:"CngAccessServiceConfig",kind:"config",file:"src/peek_app_utilities/cng_access_service.py",extends:"BaseAccessServiceConfig",
+   desc:"Constructor config for <code>CngAccessService</code>. A plain alias of <code>BaseAccessServiceConfig</code> (<code>CngAccessServiceConfig = BaseAccessServiceConfig</code>) — CNG adds no fields (it authenticates on the app JWT alone, no <code>gateway_key</code>). Every field below is inherited; required fields raise <code>ValueError</code> from the constructor when empty.",
+   fields:[]},
+  {name:"BaseAccessServiceConfig",kind:"config",file:"src/peek_app_utilities/access_service_config.py",
+   desc:"Shared constructor config for every access service (a frozen, keyword-only dataclass). <code>PeekAccessServiceConfig</code> extends it; <code>CngAccessServiceConfig</code> / <code>AcmeAccessServiceConfig</code> are plain aliases of it. Required fields raise <code>ValueError</code> from the constructor when empty.",
+   fields:[
+    {name:"install_id",type:"str",n:false,desc:"Install ID. Becomes the JWT subject. Required."},
+    {name:"jwt_secret",type:"str",n:false,desc:"HMAC secret used to sign the JWT. Required."},
+    {name:"issuer",type:"str",n:false,desc:"JWT issuer — the app name / app ID. Required."},
+    {name:"api_url",type:"str | None",n:"opt",desc:"The install's <b>base API URL</b> (persist the install webhook's <code>api_url</code>). The product service appends the <code>cng_backoffice_api-v1</code> slug and the request path. A slug already on the URL (dashes or underscores) is stripped back to the base; a different platform's slug makes the constructor raise. No app-id segment is inserted (so <code>app_id</code> is not required). Preferred over <code>base_url</code>/<code>app_id</code>."},
+    {name:"app_id",type:"str | None",n:"opt",desc:"<b>Deprecated.</b> App ID inserted into the endpoint path. Required only in legacy <code>base_url</code> mode."},
+    {name:"base_url",type:"str | None",n:"opt",desc:"<b>Deprecated.</b> Override the base URL. Default the app-registry installations API. Prefer <code>api_url</code>."},
+    {name:"token_ttl_seconds",type:"int | None",n:"opt",desc:"JWT lifetime in seconds. Default 3600."},
+    {name:"token_refresh_leeway_seconds",type:"int | None",n:"opt",desc:"Re-mint the cached token this many seconds before expiry. Default 60."},
+    {name:"retry_delays_ms",type:"Sequence[int] | None",n:"opt",desc:"Backoff delays (ms) for HTTP 429 retries. Default <code>(1000, 2000, 4000)</code>."},
+    {name:"logger",type:"Logger | None",n:"opt",desc:"Optional logger. Default no-op (silent)."},
+    {name:"http_client",type:"httpx.AsyncClient | None",n:"opt",desc:"Custom <code>httpx.AsyncClient</code>. Default one owned by the access service (closed by <code>aclose()</code> / <code>async with</code>). A caller-supplied client is never closed by the package."},
+    {name:"access_options",type:"AccessOptions | None",n:"opt",desc:"Cross-cutting access options (PII exposure). Inert for CNG today — CNG's only service reads no customer PII."}
+   ]},
+  {
+   name:"Activity",kind:"dataclass",file:"src/peek_app_utilities/models/cng/product.py",
+   desc:"A bookable activity in a CNG account. The clean model returned by <code>get_all_activities()</code>. The CNG sibling of the Peek <code>Product</code>; its shape mirrors Peek's so consumers can treat both brands uniformly (no product-type discriminator, no sub-options). Sibling const: <code>ACTIVITY_PRODUCT_TYPE = \"ACTIVITY\"</code> (<code>peek_app_utilities.models.cng.product</code>).",
+   fields:[
+     {name:"product_id",type:"str",n:false,desc:"Stable unique id for the activity. The numeric id stringified. Empty string when the source id is null."},
+     {name:"name",type:"str",n:false,desc:"Human-readable display name (default-locale). Empty string when absent."},
+     {name:"type",type:"str",n:false,desc:"Product type. Always <code>\"ACTIVITY\"</code> — the CNG payload has no type discriminator. Kept for parity with Peek."},
+     {name:"color",type:"str",n:false,desc:"Display color hex (e.g. <code>#1A2B3C</code>). Empty string when no color is set."},
+     {name:"tickets",type:"list[ActivityTicket]",n:false,desc:"Bookable sub-options. Always empty — CNG exposes no tickets on the products endpoint today."}
+   ]
+  },
+  {
+   name:"ActivityTicket",kind:"dataclass",file:"src/peek_app_utilities/models/cng/product.py",
+   desc:"A single bookable sub-option of an <code>Activity</code>. Present for parity with Peek; never populated by CNG today.",
+   fields:[
+     {name:"id",type:"str",n:false,desc:"Unique identifier of the ticket."},
+     {name:"name",type:"str",n:false,desc:"Human-readable name of the ticket."}
+   ]
+  },
+  {
+   name:"AppUtilitiesError",kind:"error class",file:"src/peek_app_utilities/errors.py",
+   desc:"Base class for every error this package raises on its own, so <code>except AppUtilitiesError</code> catches anything package-originated (token-verification failures come from PyJWT and are separate).",
+   def:"class AppUtilitiesError(Exception)"
+  },
+  {
+   name:"CngApiError",kind:"error class",file:"src/peek_app_utilities/errors.py",
+   desc:"Raised when the CNG platform returns a non-2xx response not otherwise handled (i.e. not 418/429/403). Default message <code>CNG request failed with HTTP &lt;status_code&gt;</code>.",
+   def:"class CngApiError(AppUtilitiesError):\n    def __init__(self, status_code: int, body: Any, message: str | None = None)",
+   fields:[
+     {name:"status_code",type:"int",n:false,desc:"The HTTP status that triggered the error."},
+     {name:"body",type:"Any",n:false,desc:"Raw response body (parsed JSON when possible, else text)."}
+   ]
+  },
+  {
+   name:"CngPermissionError",kind:"error class",file:"src/peek_app_utilities/errors.py",
+   desc:"Raised on HTTP 403 when the app lacks a required permission (e.g. <code>products:read</code>). Expected for a misconfigured install (not a bug); it is logged at <code>warn</code>. Raised in place of <code>CngApiError</code> for 403s only.",
+   def:"class CngPermissionError(AppUtilitiesError):\n    def __init__(self, permissions: list[str], body: Any, message: str | None = None)",
+   fields:[
+     {name:"status_code",type:"int",n:false,desc:"Always <code>403</code>."},
+     {name:"permissions",type:"list[str]",n:false,desc:"Permission names the platform reported missing. Empty when the body named none."},
+     {name:"body",type:"Any",n:false,desc:"Raw response body."}
+   ]
+  }
+ ]
+});
+</script>
+</body>
+</html>

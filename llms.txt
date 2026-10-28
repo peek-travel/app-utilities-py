@@ -159,8 +159,8 @@ from the package root.
   override `order`, `spots_taken` bounds are the caller's job); service sends it
   as-is and returns the resolved `activity_contexts`. The override variant
   classes (`FixedResourceOptionOverride`, `PercentageResourceOptionOverride`,
-  `SpotsTakenFilter`/`SpotsTakenBounds`, `StartTimeRangeFilter`) live in
-  `peek_app_utilities.models.peek.pricing`. Guide: `docs/external/pricing-api.md`.
+  `SpotsTakenFilter`/`SpotsTakenBounds`, `StartTimeRangeFilter`) are exported
+  from the package root. Guide: `docs/external/pricing-api.md`.
 - `get_daily_note_service()` — `get_today()` → `DailyNote | None`, `update(note)`
 - `get_availability_service()` — `get_availability_times(AvailabilityTimesQuery(
   activity_id, date, resource_option_quantities))` → `list[AvailabilityTime]`
@@ -347,8 +347,7 @@ node, or a JSON string; never raise on malformed input. Registration is done
 - Install from PyPI: `pip install peek-app-utilities` / `uv add peek-app-utilities`.
   See README "Install".
 - Public entry point: the package root `peek_app_utilities`. Everything under
-  `peek_app_utilities.internal` is internal — rely on the root barrel (and the
-  documented `peek_app_utilities.models.peek.pricing` variant classes), don't
+  `peek_app_utilities.internal` is internal — rely on the root barrel, don't
   deep-import internal modules.
 - Not ported from `@peektravel/app-utilities`: the deprecated top-level
   short-form proxies on the access services (use `get_<resource>_service()`),

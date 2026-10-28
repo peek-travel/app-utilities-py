@@ -1,0 +1,1305 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Reference — peek-app-utilities</title>
+<script>(function(){try{var u=new URLSearchParams(location.search).get("theme");var s=u||localStorage.getItem("theme");var t=(s==="light"||s==="dark")?s:"light";document.documentElement.setAttribute("data-theme",t);if(u==="light"||u==="dark"){try{localStorage.setItem("theme",u);}catch(e){}}}catch(e){}})();</script>
+<style>
+  :root{
+    --bg:#0d1117; --panel:#161b22; --panel2:#1c2330; --border:#2a3441;
+    --text:#e6edf3; --muted:#8b949e; --accent:#58a6ff; --accent2:#3fb950;
+    --type:#79c0ff; --null:#f0883e; --danger:#f85149; --pii:#d2a8ff;
+    --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+    --c-com:#8b949e; --c-str:#a5d6ff; --c-num:#79c0ff; --c-kw:#ff7b72; --c-lit:#79c0ff; --c-con:#79c0ff; --c-cls:#ffa657; --c-fn:#d2a8ff;
+  }
+  html[data-theme="light"]{
+    --bg:#f6f8fa; --panel:#ffffff; --panel2:#eef1f5; --border:#d0d7de;
+    --text:#1f2328; --muted:#59636e; --accent:#0969da; --accent2:#1a7f37;
+    --type:#0550ae; --null:#bc4c00; --danger:#cf222e; --pii:#8250df;
+    --c-com:#6e7781; --c-str:#0a3069; --c-num:#0550ae; --c-kw:#cf222e; --c-lit:#0550ae; --c-con:#0550ae; --c-cls:#953800; --c-fn:#8250df;
+  }
+  html[data-theme="light"] .desc,
+  html[data-theme="light"] .ctor,
+  html[data-theme="light"] .notes li,
+  html[data-theme="light"] .sig,
+  html[data-theme="light"] .example{color:#24292f}
+  html[data-theme="light"] .badge.opt{background:#eaeef2;color:#59636e}
+  html[data-theme="light"] ::-webkit-scrollbar-thumb{background:#d0d7de;border-color:#f6f8fa}
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{background:var(--bg);color:var(--text);font:14px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;display:flex}
+  a{color:var(--accent);text-decoration:none}
+  code,.mono{font-family:var(--mono)}
+  /* sidebar */
+  #sidebar{width:300px;min-width:300px;height:100vh;overflow-y:auto;background:var(--panel);border-right:1px solid var(--border);position:sticky;top:0;padding:0 0 40px}
+  #brand{padding:18px 20px 12px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--panel);z-index:2}
+  #brand h1{margin:0;font-size:16px;letter-spacing:.3px}
+  #brand .tag{display:inline-block;margin-top:6px;font-size:11px;color:var(--bg);background:var(--accent2);padding:2px 8px;border-radius:10px;font-weight:600}
+  .pkgbadge{display:inline-block;margin:6px 0 0 6px;font-size:11px;color:var(--muted);border:1px solid var(--border);border-radius:10px;padding:2px 8px;font-family:var(--mono)}
+  #brand .links{margin-top:10px;font-size:12px;display:flex;gap:12px}
+  .themebtn{margin-left:auto;background:var(--panel2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:2px 9px;cursor:pointer;font-size:13px;line-height:1.4}
+  .themebtn:hover{border-color:var(--accent);color:var(--accent)}
+  #search{width:100%;margin-top:12px;padding:8px 10px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px}
+  .navgroup{padding:14px 12px 4px 20px;font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted)}
+  .navitem{display:block;padding:5px 20px 5px 24px;color:var(--text);font-size:13px;border-left:2px solid transparent;cursor:pointer}
+  .navitem:hover{background:var(--panel2)}
+  .navitem.active{border-left-color:var(--accent);background:var(--panel2);color:var(--accent)}
+  .navitem .k{font-family:var(--mono);font-size:12px}
+  /* main */
+  #main{flex:1;min-width:0;height:100vh;overflow-y:auto;padding:0 48px 120px}
+  #hero{padding:40px 0 20px;border-bottom:1px solid var(--border);margin-bottom:8px}
+  #hero h2{margin:0 0 8px;font-size:28px}
+  #hero p{color:var(--muted);max-width:820px;margin:6px 0}
+  section.card{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:22px 24px;margin:26px 0;scroll-margin-top:20px}
+  section.card h3{margin:0 0 4px;font-size:20px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .pill{font-size:11px;padding:2px 8px;border-radius:10px;font-weight:600}
+  .pill.svc{background:#1f6feb33;color:var(--accent);border:1px solid #1f6feb55}
+  .pill.model{background:#3fb95033;color:var(--accent2);border:1px solid #3fb95055}
+  .pill.pii{background:#8957e533;color:var(--pii);border:1px solid #8957e555}
+  .file{font-family:var(--mono);font-size:12px;color:var(--muted);margin:2px 0 12px}
+  .desc{color:#c9d1d9;margin:8px 0 14px;max-width:900px}
+  .ctor{font-family:var(--mono);font-size:12.5px;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:10px 12px;overflow-x:auto;margin:6px 0 14px;color:#c9d1d9;white-space:pre-wrap}
+  .example{font-family:var(--mono);font-size:12.5px;line-height:1.55;white-space:pre;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:12px 14px;overflow-x:auto;margin:6px 0 14px;color:#c9d1d9}
+  .example .t-com{color:var(--c-com);font-style:italic}
+  .example .t-str{color:var(--c-str)}
+  .example .t-num{color:var(--c-num)}
+  .example .t-kw{color:var(--c-kw)}
+  .example .t-lit{color:var(--c-lit)}
+  .example .t-con{color:var(--c-con)}
+  .example .t-cls{color:var(--c-cls)}
+  .example .t-fn{color:var(--c-fn)}
+  .notes{list-style:none;padding:0;margin:6px 0 12px}
+  .notes li{padding:6px 10px 6px 28px;position:relative;background:var(--panel2);border:1px solid var(--border);border-radius:6px;margin:5px 0;font-size:12.5px;color:#c9d1d9}
+  .notes li:before{content:"›";position:absolute;left:11px;color:var(--accent);font-weight:700}
+  table{width:100%;border-collapse:collapse;margin:8px 0 4px;font-size:13px}
+  th{text-align:left;padding:8px 10px;border-bottom:2px solid var(--border);color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.5px;font-weight:600}
+  td{padding:8px 10px;border-bottom:1px solid var(--border);vertical-align:top}
+  tr:last-child td{border-bottom:none}
+  tr:hover td{background:var(--panel2)}
+  .m-name{font-family:var(--mono);color:var(--accent);white-space:nowrap;font-weight:600}
+  .sig{font-family:var(--mono);color:#c9d1d9;font-size:12px}
+  .type{font-family:var(--mono);color:var(--type);font-size:12.5px}
+  a.mlink{color:var(--accent);text-decoration:none;border-bottom:1px dashed #58a6ff66;cursor:pointer}
+  a.mlink:hover{border-bottom-style:solid;color:#79c0ff}
+  .type a.mlink{color:var(--type);border-bottom-color:#79c0ff66}
+  .null-y{color:var(--null);font-weight:600}
+  .null-n{color:var(--muted)}
+  .subhead{margin:20px 0 4px;font-size:13px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted)}
+  .hidden{display:none !important}
+  .fieldname{font-family:var(--mono);font-weight:600}
+  .badge{display:inline-block;font-size:10px;padding:1px 6px;border-radius:8px;margin-left:6px;vertical-align:middle}
+  .badge.opt{background:#30363d;color:var(--muted)}
+  .badge.inh{background:#1f6feb22;color:var(--muted);border:1px solid var(--border);font-weight:500}
+  .extends{font-family:var(--mono);font-size:12.5px;color:var(--muted);margin:-4px 0 12px}
+  tr.inh-row .fieldname{opacity:.92}
+  .empty{color:var(--muted);font-style:italic;padding:12px 0}
+  ::-webkit-scrollbar{width:11px;height:11px}
+  ::-webkit-scrollbar-thumb{background:#30363d;border-radius:6px;border:2px solid var(--bg)}
+</style>
+</head>
+<body>
+<nav id="sidebar">
+  <div id="brand">
+    <h1>Peek Platform</h1>
+    <span class="tag">peek-app-utilities</span>
+    <span class="pkgbadge">Python · PyPI package</span>
+    <div class="links">
+      <a href="../index.html">← Home</a>
+      <button id="themeBtn" class="themebtn" title="Toggle light/dark" aria-label="Toggle theme">◐</button>
+    </div>
+    <input id="search" placeholder="Filter services & models…" autocomplete="off"/>
+  </div>
+  <div id="nav"></div>
+</nav>
+<main id="main">
+  <div id="hero">
+    <h2 id="heroTitle"></h2>
+    <p id="heroSub"></p>
+  </div>
+  <div id="content"></div>
+</main>
+<script>
+/* ---------- shared renderer ---------- */
+function nullCell(n){return n===true?'<span class="null-y">nullable</span>':n==="opt"?'<span class="null-y">optional</span>':'<span class="null-n">—</span>';}
+function el(tag,cls,html){const e=document.createElement(tag);if(cls)e.className=cls;if(html!=null)e.innerHTML=html;return e;}
+function slug(s){return s.replace(/[^a-zA-Z0-9]+/g,'-');}
+let LINK_RE=null,LINK_MAP=null;
+function linkify(str){
+  if(!str||!LINK_RE)return str;
+  return str.replace(LINK_RE,m=>'<a class="mlink" href="#'+LINK_MAP[m]+'">'+m+'</a>');
+}
+
+function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function highlight(code){
+  var pats=[
+    ['com',/#[^\n]*/],
+    ['str',/"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'/],
+    ['num',/\b\d[\d_]*(?:\.\d+)?\b/],
+    ['kw',/\b(?:import|from|as|async|await|def|return|if|elif|else|for|in|with|class|lambda|not|and|or|is|raise|try|except|finally|pass|yield|while|del|assert)\b/],
+    ['lit',/\b(?:True|False|None|self|cls)\b/],
+    ['con',/\b[A-Z][A-Z0-9_]+\b/],
+    ['cls',/\b[A-Z][\w$]*\b/],
+    ['fn',/[A-Za-z_$][\w$]*(?=\s*\()/],
+    ['id',/[A-Za-z_$][\w$]*/],
+    ['pun',/[{}()\[\].;,:=<>|&?!+\-*\/]/],
+    ['ws',/\s+/],
+    ['any',/[\s\S]/]
+  ];
+  var master=new RegExp(pats.map(function(p){return '('+p[1].source+')';}).join('|'),'g');
+  var out='';
+  code.replace(master,function(m){
+    var g=Array.prototype.slice.call(arguments,1,1+pats.length);
+    var i=g.findIndex(function(x){return x!==undefined;});
+    var cls=pats[i][0];
+    if(cls==='ws') out+=m;
+    else if(cls==='id'||cls==='pun'||cls==='any') out+=esc(m);
+    else out+='<span class="t-'+cls+'">'+esc(m)+'</span>';
+    return m;
+  });
+  return out;
+}
+
+function render(DATA){
+  document.title = DATA.title+" Platform — peek-app-utilities";
+  heroTitle.textContent = DATA.hero;
+  heroSub.innerHTML = DATA.heroSub;
+  // sort: root *AccessService first, other services A–Z; models A–Z;
+  // methods within each service A–Z
+  DATA.services.sort((a,b)=>{
+    const ra=/AccessService$/.test(a.name), rb=/AccessService$/.test(b.name);
+    if(ra!==rb)return ra?-1:1;
+    return a.name.localeCompare(b.name);
+  });
+  DATA.services.forEach(s=>{if(s.methods)s.methods.sort((a,b)=>a.name.localeCompare(b.name));});
+  DATA.models.sort((a,b)=>a.name.localeCompare(b.name));
+  LINK_MAP={};
+  DATA.models.forEach(m=>{LINK_MAP[m.name]='mdl-'+slug(m.name);});
+  DATA.services.forEach(x=>{LINK_MAP[x.name]='svc-'+slug(x.name);});
+  const _names=Object.keys(LINK_MAP).sort((a,b)=>b.length-a.length);
+  LINK_RE=new RegExp('\\b('+_names.join('|')+')\\b','g');
+  const nav=document.getElementById('nav'), content=document.getElementById('content');
+
+  const _isAccess=s=>/AccessService$/.test(s.name);
+  const _access=DATA.services.filter(_isAccess), _rest=DATA.services.filter(s=>!_isAccess(s));
+  function _navSvc(s){const a=el('a','navitem');a.dataset.target='svc-'+slug(s.name);a.innerHTML='<span class="k">'+s.name+'</span>';nav.appendChild(a);}
+  if(_access.length){nav.appendChild(el('div','navgroup','Access Service'));_access.forEach(_navSvc);}
+  if(_rest.length){nav.appendChild(el('div','navgroup','Service Classes'));_rest.forEach(_navSvc);}
+  nav.appendChild(el('div','navgroup','Data Models'));
+  DATA.models.forEach(m=>{
+    const a=el('a','navitem');a.dataset.target='mdl-'+slug(m.name);
+    a.innerHTML='<span class="k">'+m.name+'</span>';nav.appendChild(a);
+  });
+
+  // services
+  DATA.services.forEach(s=>{
+    const c=el('section','card');c.id='svc-'+slug(s.name);c.dataset.search=(s.name+' '+s.desc).toLowerCase();
+    let h='<h3>'+s.name+' <span class="pill svc">service</span></h3>';
+    h+='<div class="file">'+s.file+'</div>';
+    if(s.desc)h+='<div class="desc">'+s.desc+'</div>';
+    if(s.ctor)h+='<div class="subhead">Constructor</div><div class="ctor">'+linkify(s.ctor)+'</div>';
+    if(s.obtain)h+='<div class="subhead">Obtain</div><div class="ctor">'+linkify(s.obtain)+'</div>';
+    if(s.notes&&s.notes.length){h+='<div class="subhead">Behavior</div><ul class="notes">'+s.notes.map(n=>'<li>'+n+'</li>').join('')+'</ul>';}
+    if(s.example)h+='<div class="subhead">Example</div><pre class="example">'+highlight(s.example)+'</pre>';
+    if(s.methods&&s.methods.length){
+      h+='<div class="subhead">Methods</div><table><thead><tr><th>Method</th><th>Signature</th><th>Description</th></tr></thead><tbody>';
+      s.methods.forEach(m=>{
+        let notes=m.notes?'<div style="margin-top:6px;color:var(--muted);font-size:12px">'+m.notes+'</div>':'';
+        let pii=m.pii?' <span class="pill pii">PII-gated</span>':'';
+        h+='<tr><td class="m-name">'+m.name+pii+'</td><td class="sig">'+linkify(m.sig)+'</td><td>'+m.desc+notes+'</td></tr>';
+      });
+      h+='</tbody></table>';
+    }
+    c.innerHTML=h;content.appendChild(c);
+  });
+
+  // models
+  const MBN={}; DATA.models.forEach(m=>{MBN[m.name]=m;});
+  function resolveFields(m){
+    const rows=(m.fields||[]).map(f=>({f,from:null}));
+    const seen=new Set([m.name]); let pn=m.extends;
+    while(pn && !seen.has(pn)){seen.add(pn);const p=MBN[pn];if(!p)break;(p.fields||[]).forEach(f=>rows.push({f,from:p.name}));pn=p.extends;}
+    return rows;
+  }
+  DATA.models.forEach(m=>{
+    const c=el('section','card');c.id='mdl-'+slug(m.name);c.dataset.search=(m.name+' '+(m.desc||'')+' '+(m.extends||'')).toLowerCase();
+    let h='<h3>'+m.name+' <span class="pill model">'+(m.kind||'model')+'</span></h3>';
+    if(m.file)h+='<div class="file">'+m.file+'</div>';
+    if(m.desc)h+='<div class="desc">'+m.desc+'</div>';
+    if(m.extends)h+='<div class="extends">Extends '+linkify(m.extends)+'</div>';
+    if(m.def)h+='<div class="ctor">'+linkify(m.def)+'</div>';
+    const rows=resolveFields(m);
+    if(rows.length){
+      h+='<table><thead><tr><th>Field</th><th>Type</th><th>Nullability</th><th>Description</th></tr></thead><tbody>';
+      rows.forEach(r=>{
+        const f=r.f;
+        const inh=r.from?' <span class="badge inh">inherited from '+linkify(r.from)+'</span>':'';
+        h+='<tr'+(r.from?' class="inh-row"':'')+'><td class="fieldname">'+f.name+inh+'</td><td class="type">'+linkify(f.type)+'</td><td>'+nullCell(f.n)+'</td><td>'+f.desc+'</td></tr>';
+      });
+      h+='</tbody></table>';
+    }
+    c.innerHTML=h;content.appendChild(c);
+  });
+
+  // nav interactions
+  const items=[...document.querySelectorAll('.navitem')];
+  items.forEach(a=>a.addEventListener('click',()=>{
+    const t=document.getElementById(a.dataset.target);
+    if(t)t.scrollIntoView({behavior:'smooth',block:'start'});
+  }));
+  const cards=[...document.querySelectorAll('section.card')];
+  const io=new IntersectionObserver(es=>{
+    es.forEach(e=>{if(e.isIntersecting){
+      const id=e.target.id;items.forEach(a=>a.classList.toggle('active',a.dataset.target===id));
+    }});
+  },{rootMargin:'-10% 0px -80% 0px'});
+  cards.forEach(c=>io.observe(c));
+
+  // model cross-links
+  document.addEventListener('click',ev=>{
+    const a=ev.target.closest&&ev.target.closest('.mlink');if(!a)return;
+    ev.preventDefault();
+    const t=document.getElementById(a.getAttribute('href').slice(1));
+    if(t){const sb=document.getElementById('search');if(sb&&sb.value){sb.value='';sb.dispatchEvent(new Event('input'));}
+      t.scrollIntoView({behavior:'smooth',block:'start'});}
+  });
+
+  // theme toggle (+ carry the choice across the sibling pages via ?theme=,
+  // since file:// localStorage is isolated per page in some browsers)
+  function _syncThemeLinks(t){
+    document.querySelectorAll('#brand .links a').forEach(a=>{
+      a.setAttribute('href', a.getAttribute('href').split('?')[0]+'?theme='+t);
+    });
+  }
+  _syncThemeLinks(document.documentElement.getAttribute('data-theme')||'light');
+  const _tb=document.getElementById('themeBtn');
+  if(_tb)_tb.addEventListener('click',()=>{
+    const cur=document.documentElement.getAttribute('data-theme')==='light'?'dark':'light';
+    document.documentElement.setAttribute('data-theme',cur);
+    try{localStorage.setItem('theme',cur);}catch(e){}
+    _syncThemeLinks(cur);
+  });
+
+  // search
+  document.getElementById('search').addEventListener('input',ev=>{
+    const q=ev.target.value.trim().toLowerCase();
+    cards.forEach(c=>{
+      const show=!q||c.dataset.search.includes(q);
+      c.classList.toggle('hidden',!show);
+      const a=document.querySelector('.navitem[data-target="'+c.id+'"]');
+      if(a)a.classList.toggle('hidden',!show);
+    });
+  });
+}
+</script>
+
+<script>
+/* ---------- PEEK DATA ---------- */
+render({
+ title:"Peek",
+ hero:"Peek Platform",
+ heroSub:"Rooted at <code>PeekAccessService</code>, which lazily hands out memoized per-resource service classes, each reached through a shared authenticated client. Every I/O method is <code>async</code>; every result is a frozen dataclass. Public model types live in <code>peek_app_utilities.models.peek</code> and are re-exported from the package root. The <code>full_customer_access</code> flag (default off) gates customer PII: PII-marked methods raise <code>PiiAccessDisabledError</code> before any network call, and PII fields are omitted from reads.",
+ services:[
+  {
+   name:"PeekAccessService",
+   file:"src/peek_app_utilities/peek_access_service.py",
+   desc:"The public entry point. Construct one per install with a <code>PeekAccessServiceConfig</code>. Validates the config and hands out the per-resource service classes through its <code>get_…_service()</code> accessors (lazily created and memoized), all bound to one shared authenticated client (a <code>GraphQLClient</code>) that mints and caches a short-lived JWT on demand. Supports <code>async with</code>, which closes the package-owned HTTP client on exit.",
+   ctor:"PeekAccessService(config: PeekAccessServiceConfig)",
+   example:"import os\nfrom peek_app_utilities import PeekAccessService, PeekAccessServiceConfig\n\nasync with PeekAccessService(PeekAccessServiceConfig(\n    install_id=\"install_123\",  # from verify_peek_auth_token(token).install_id\n    jwt_secret=os.environ[\"APP_SECRET\"],\n    issuer=\"my-app\",\n    api_url=\"https://apps.peek.com/installations-api/my-app\",  # from the install webhook\n)) as peek:\n    # every product (activities + add-ons) as one flat list\n    products = await peek.get_product_service().get_all_products()",
+   methods:[
+     {name:"get_product_service",sig:"def get_product_service(self) -&gt; ProductService",desc:"Product service (lazily created + memoized)."},
+     {name:"get_account_user_service",sig:"def get_account_user_service(self) -&gt; AccountUserService",desc:"Account-user service."},
+     {name:"get_resource_pool_service",sig:"def get_resource_pool_service(self) -&gt; ResourcePoolService",desc:"Resource-pool service."},
+     {name:"get_timeslot_service",sig:"def get_timeslot_service(self) -&gt; TimeslotService",desc:"Timeslot service (composed with the resource-pool + account-user services)."},
+     {name:"get_reseller_service",sig:"def get_reseller_service(self) -&gt; ResellerService",desc:"Reseller service."},
+     {name:"get_promo_code_service",sig:"def get_promo_code_service(self) -&gt; PromoCodeService",desc:"Promo-code service."},
+     {name:"get_pricing_service",sig:"def get_pricing_service(self) -&gt; PricingService",desc:"Pricing service."},
+     {name:"get_daily_note_service",sig:"def get_daily_note_service(self) -&gt; DailyNoteService",desc:"Daily-note service."},
+     {name:"get_availability_service",sig:"def get_availability_service(self) -&gt; AvailabilityService",desc:"Availability service."},
+     {name:"get_membership_service",sig:"def get_membership_service(self) -&gt; MembershipService",desc:"Membership service."},
+     {name:"get_booking_service",sig:"def get_booking_service(self, integrator: str | None = None) -&gt; BookingService",desc:"Booking service (composed with the product service; receives the resolved access options). Instances are memoized per <code>integrator</code>.",notes:"<code>integrator</code> scopes <code>get_meta_data</code> results and the <code>set_meta_data_…</code> writes; it defaults to the config's <code>issuer</code>. <b>Do not set it</b> unless Peek engineering created a custom integrator id for this integration."},
+     {name:"get_review_service",sig:"def get_review_service(self) -&gt; ReviewService",desc:"Review service (receives the resolved access options)."},
+     {name:"verify_peek_auth_token",sig:"def verify_peek_auth_token(self, token: str) -&gt; PeekAuthTokenClaims",desc:"Verifies an app-registry JWT (HMAC signature with this service's <code>jwt_secret</code>, expiry, <code>app_registry_v2</code> issuer, <code>Joken</code> audience) and returns the decoded claims. Accepts a raw <code>x-peek-auth</code> header value (a leading <code>Bearer </code> is stripped). Synchronous — no network.",notes:"Raises PyJWT's <code>jwt.ExpiredSignatureError</code> / <code>jwt.ImmatureSignatureError</code> / <code>jwt.InvalidTokenError</code> (the base class — also covers a bad signature, wrong issuer/audience, malformed token) on verification failure; claim extraction never raises (absent <code>user</code> → <code>None</code>, sentinel user fields <code>\"\"</code>/<code>\"null\"</code> → <code>None</code>)."},
+     {name:"aclose",sig:"async def aclose(self) -&gt; None",desc:"Closes the package-owned HTTP client. A caller-supplied <code>http_client</code> is left open.",notes:"Called automatically on <code>async with</code> exit."},
+     {name:"__aenter__ / __aexit__",sig:"async with PeekAccessService(config) as peek: …",desc:"Async context-manager support: enters with the service itself and calls <code>aclose()</code> on exit."}
+   ]
+  },
+  {
+   name:"ProductService",
+   file:"src/peek_app_utilities/internal/peek/products/product_service.py",
+   desc:"Product operations. The item-options page size comes from the access-service config (<code>item_options_page_size</code>, default 50).",
+   obtain:"PeekAccessService.get_product_service()",
+   methods:[
+     {name:"get_all_products",sig:"async def get_all_products(self) -&gt; list[Product]",desc:"Every product as one flat list: activities + add-ons (add-ons tagged <code>ADD-ON</code>).",notes:"Fetches activities and all add-on pages concurrently; walks add-on cursor pagination to the end."},
+     {name:"get_all_activities",sig:"async def get_all_activities(self) -&gt; list[Product]",desc:"Products with type <code>ACTIVITY</code>.",notes:"Filters the activities to <code>ACTIVITY_PRODUCT_TYPE</code>."},
+     {name:"get_all_rentals",sig:"async def get_all_rentals(self) -&gt; list[Product]",desc:"Products with type <code>RENTAL</code>.",notes:"Filters the activities to <code>RENTAL_PRODUCT_TYPE</code>."},
+     {name:"get_all_addons",sig:"async def get_all_addons(self) -&gt; list[Product]",desc:"Only add-on products.",notes:"Paginated."},
+     {name:"get_custom_questions",sig:"async def get_custom_questions(self, product_id: str) -&gt; list[CustomQuestion]",desc:"Every custom question configured on one activity, in Peek's order.",notes:"Raises <code>ValueError</code> (\"A non-empty product id is required.\") on a blank id before any network call; returns <code>[]</code> for an unknown activity. Definitions only — no PII, unaffected by <code>full_customer_access</code>."}
+   ]
+  },
+  {
+   name:"AccountUserService",
+   file:"src/peek_app_utilities/internal/peek/account_users/account_user_service.py",
+   desc:"Active staff / guides. Only <b>active</b> users are returned. Pages of 50 are walked to the end.",
+   obtain:"PeekAccessService.get_account_user_service()",
+   methods:[
+     {name:"get_all",sig:"async def get_all(self) -&gt; list[AccountUser]",desc:"All active account users.",notes:"Walks cursor pagination to the end; inactive users omitted."},
+     {name:"get_by_id",sig:"async def get_by_id(self, user_id: str) -&gt; AccountUser | None",desc:"Single active user by id, or <code>None</code>.",notes:"Filters by <code>{ ids: [user_id] }</code>; <code>None</code> when no active user matches."}
+   ]
+  },
+  {
+   name:"ResourcePoolService",
+   file:"src/peek_app_utilities/internal/peek/resource_pools/resource_pool_service.py",
+   desc:"Resource-pool operations.",
+   obtain:"PeekAccessService.get_resource_pool_service()",
+   methods:[
+     {name:"get_all",sig:"async def get_all(self, mode: ResourcePoolMode | None = None) -&gt; list[ResourcePool]",desc:"All resource pools for the mode filter.",notes:"<code>mode</code> defaults to <code>\"ALL\"</code>."}
+   ]
+  },
+  {
+   name:"TimeslotService",
+   file:"src/peek_app_utilities/internal/peek/timeslots/timeslot_service.py",
+   desc:"Timeslot operations. Composed internally with the <code>ResourcePoolService</code> and <code>AccountUserService</code> so it can resolve guides to resource pools.",
+   obtain:"PeekAccessService.get_timeslot_service()",
+   methods:[
+     {name:"get_for_day",sig:"async def get_for_day(self, product_id: str, date: str, filter: TimeslotFilter | None = None) -&gt; list[Timeslot]",desc:"Timeslots for an activity on a date.",notes:"<code>filter</code> defaults to <code>\"all\"</code>; <code>date</code> is normalized to <code>YYYY-MM-DD</code> (any time component dropped)."},
+     {name:"get_by_id",sig:"async def get_by_id(self, timeslot_id: str) -&gt; Timeslot | None",desc:"Single timeslot by id, or <code>None</code>.",notes:"Product id extracted from the <code>&lt;activityId&gt;|...</code> timeslot id."},
+     {name:"set_availability",sig:"async def set_availability(self, timeslot_id: str, status: str) -&gt; UpdateTimeslotResult",desc:"Sets the timeslot status (open/closed)."},
+     {name:"set_notes",sig:"async def set_notes(self, timeslot_id: str, manifest_notes: str) -&gt; UpdateTimeslotResult",desc:"Sets the timeslot manifest notes."},
+     {name:"assign_guide",sig:"async def assign_guide(self, assignment: GuideAssignment) -&gt; AssignGuideResult",desc:"Assigns/unassigns guides across timeslots.",notes:"Resolves guides to guide resource pools (by pool id, account-user id, or name) — the pool and account-user reads run concurrently. Raises <code>ValueError</code> when <code>timeslot_ids</code>/<code>guide_ids</code> is empty, when <code>action</code> is neither <code>assign</code>/<code>unassign</code>, or when a guide can't be matched (\"Guide not found: &lt;id&gt;\"). Returns <code>status=\"error\"</code> (with <code>errors</code>) when Peek returns no allocation request."}
+   ]
+  },
+  {
+   name:"ResellerService",
+   file:"src/peek_app_utilities/internal/peek/resellers/reseller_service.py",
+   desc:"Reseller-channel operations.",
+   obtain:"PeekAccessService.get_reseller_service()",
+   methods:[
+     {name:"get_all_channels",sig:"async def get_all_channels(self, agents_per_channel: int | None = None) -&gt; list[Channel]",desc:"All reseller channels, each with up to <code>agents_per_channel</code> agents.",notes:"<code>agents_per_channel</code> defaults to 10."}
+   ]
+  },
+  {
+   name:"PromoCodeService",
+   file:"src/peek_app_utilities/internal/peek/promo_codes/promo_code_service.py",
+   desc:"Promo-code operations. Pages of 50 are walked to the end.",
+   obtain:"PeekAccessService.get_promo_code_service()",
+   methods:[
+     {name:"get_all",sig:"async def get_all(self) -&gt; list[PromoCode]",desc:"All promo codes.",notes:"Walks cursor pagination to the end."},
+     {name:"create",sig:"async def create(self, input: CreatePromoCodeInput) -&gt; CreatedPromoCode",desc:"Creates a promo code.",notes:"Validates: <code>name</code>, <code>code</code>, <code>amount</code>, <code>discount_type</code> required; <code>discount_type</code> must be <code>percent</code>/<code>fixed</code>; <code>amount</code> must parse as a number; <code>currency</code> (default <code>USD</code>) must be 3 uppercase letters. Raises <code>ValueError</code> on validation failure, on a Peek <code>InvalidDataError</code> (carrying Peek's message), or when no data is returned."}
+   ]
+  },
+  {
+   name:"PricingService",
+   file:"src/peek_app_utilities/internal/peek/pricing/pricing_service.py",
+   desc:"Thin, faithful wrapper over the Peek pricing primitives — does NOT own override domain logic (segmenting activities across time windows, ordering tiers, computing <code>spots_taken</code> bounds stay in the caller).",
+   obtain:"PeekAccessService.get_pricing_service()",
+   methods:[
+     {name:"create_engine",sig:"async def create_engine(self, input: CreateEngineInput) -&gt; CreatedPricingEngine",desc:"Creates a pricing engine; store the returned id.",notes:"Raises <code>ValueError</code> (\"name is required\") on a blank name; on a Peek <code>InvalidDataError</code> (carrying Peek's message); or when no data is returned."},
+     {name:"update_engine",sig:"async def update_engine(self, input: UpdateEngineInput) -&gt; PricingEngine",desc:"Updates an engine's name and/or activity scope.",notes:"Raises <code>ValueError</code> on a blank <code>engine_id</code>/<code>name</code>; on a Peek <code>InvalidDataError</code>/<code>NotFoundError</code>; or when no data is returned. An empty or omitted <code>activity_ids</code> clears the scope."},
+     {name:"delete_engine",sig:"async def delete_engine(self, engine_id: str) -&gt; None",desc:"Deletes a pricing engine.",notes:"<b>Idempotent</b> — a Peek <code>NotFoundError</code> resolves as success. Raises <code>ValueError</code> on a blank <code>engine_id</code>."},
+     {name:"upsert_overrides",sig:"async def upsert_overrides(self, input: UpsertOverridesInput) -&gt; UpsertOverridesResult",desc:"Upserts overrides for the engine + date range — a full replace per <code>(date_range, activity)</code>.",notes:"Validates engine id, date range, the activities list, each activity id, and each resource-option override (fixed: 3-letter uppercase currency + numeric amount; percentage: numeric and <code>&gt; -100</code>). Raises <code>ValueError</code> on validation failure, a Peek <code>InvalidDataError</code>, or no data."},
+     {name:"clear_overrides",sig:"async def clear_overrides(self, input: ClearOverridesInput) -&gt; UpsertOverridesResult",desc:"Clears all overrides for the given activities across a date range (an upsert with empty overrides).",notes:"Validates <code>engine_id</code>, <code>date_range</code>, the <code>activity_ids</code> list + each id. Never clear by omitting an activity."}
+   ]
+  },
+  {
+   name:"DailyNoteService",
+   file:"src/peek_app_utilities/internal/peek/daily_notes/daily_note_service.py",
+   desc:"Daily-note operations.",
+   obtain:"PeekAccessService.get_daily_note_service()",
+   methods:[
+     {name:"get_today",sig:"async def get_today(self) -&gt; DailyNote | None",desc:"Today's daily note, or <code>None</code> when none is set.",notes:"Uses the global note type."},
+     {name:"update",sig:"async def update(self, note: str) -&gt; DailyNote | None",desc:"Upserts the daily note; returns the saved note or <code>None</code>."}
+   ]
+  },
+  {
+   name:"AvailabilityService",
+   file:"src/peek_app_utilities/internal/peek/availability/availability_service.py",
+   desc:"Availability operations.",
+   obtain:"PeekAccessService.get_availability_service()",
+   methods:[
+     {name:"get_availability_times",sig:"async def get_availability_times(self, query: AvailabilityTimesQuery) -&gt; list[AvailabilityTime]",desc:"Availability times for an activity/date and requested quantities.",notes:"Returns <code>[]</code> when Peek reports none."}
+   ]
+  },
+  {
+   name:"MembershipService",
+   file:"src/peek_app_utilities/internal/peek/memberships/membership_service.py",
+   desc:"Membership operations.",
+   obtain:"PeekAccessService.get_membership_service()",
+   methods:[
+     {name:"get_all",sig:"async def get_all(self) -&gt; list[Membership]",desc:"All membership variants, flattened into <code>Membership</code> records.",notes:"Memberships with no variants produce no records."},
+     {name:"purchase",sig:"async def purchase(self, input: MembershipPurchaseInput) -&gt; PurchasedMembership",desc:"Purchases a membership via a two-step quote → order flow.",notes:"Validates: <code>membership_variant_id</code> and <code>email</code> required, <code>email</code> regex-valid; optional <code>country</code> (2 letters) and <code>phone</code> valid if present — every problem is joined into one <code>ValueError</code> message. Generates a <code>refid</code> via <code>uuid4()</code>. Raises <code>ValueError</code> on validation failure, quote errors, a missing quote id, order errors, or missing sales. Balance defaults to <code>0.00</code>/<code>USD</code>/<code>$0.00</code> when absent."}
+   ]
+  },
+  {
+   name:"BookingService",
+   file:"src/peek_app_utilities/internal/peek/bookings/booking_service.py",
+   desc:"Booking operations. Receives the resolved access options (PII on/off) and the integrator from the access service; pages of 50. Also exports <code>AddAddonInput</code> and <code>CancelBookingResult</code> (both re-exported from the package root).",
+   obtain:"PeekAccessService.get_booking_service(integrator=None)",
+   notes:[
+     "<b>Integrator:</b> the <code>integrator</code> that scopes <code>get_meta_data</code> and the <code>set_meta_data_…</code> writes is configured once when you obtain the service, via <code>PeekAccessService.get_booking_service(integrator=None)</code> — it is not a per-call argument. <b>Do not set it</b> unless Peek engineering created a custom integrator id for this integration.",
+     "<b>PII gating:</b> when <code>full_customer_access</code> is <code>False</code>, <code>get_payments_on_file</code>, <code>make_payment</code>, <code>refund</code>, <code>create_invoice_link</code>, <code>add_addon</code>, <code>remove_addon</code> raise <code>PiiAccessDisabledError</code> before any network call. Reads/mutations (<code>get_by_id</code>, <code>get_guests</code>, <code>get_meta_data</code>, <code>cancel</code>, <code>append_note</code>, <code>set_checkin_status</code>, <code>update_custom_status</code>, the <code>set_meta_data_…</code> writers, <code>list_addons</code>) and <code>create</code> (incl. <code>mark_as_paid</code>) remain available; PII fields are simply never requested for reads.",
+     "<b>Id validation:</b> every booking id is checked (must be <code>b_[a-z0-9]+</code> or <code>B-[A-Z0-9]+</code>) and order ids likewise (<code>o_…</code>/<code>O-…</code>) <i>before</i> normalization, raising <code>ValueError</code>; then the id is normalized — lowercased and <code>-</code>→<code>_</code> — so <code>B-ABC123</code> and <code>b_abc123</code> resolve to the same booking."
+   ],
+   methods:[
+     {name:"get_by_id",sig:"async def get_by_id(self, booking_id: str, options: BookingReadOptions | None = None) -&gt; Booking | None",desc:"Single booking by id, or <code>None</code>.",notes:"Validates the booking id; <code>include_guests</code>/<code>include_price_breakdown</code> default <code>False</code>."},
+     {name:"search_by_time_range",sig:"async def search_by_time_range(self, search: BookingTimeRangeSearch) -&gt; list[Booking]",desc:"All bookings in a time range (paginated).",notes:"<code>search_by</code> defaults to purchase date."},
+     {name:"search_by_timeslot",sig:"async def search_by_timeslot(self, timeslot_id: str, options: BookingReadOptions | None = None) -&gt; list[Booking]",desc:"All bookings on a timeslot (paginated)."},
+     {name:"get_guests",sig:"async def get_guests(self, booking_id: str) -&gt; list[Guest]",desc:"Guests on a booking (primary included).",notes:"Validates the booking id; guest identity fields come back <code>None</code> when PII is off — only ids and participation/opt-in flags are populated."},
+     {name:"get_meta_data",sig:"async def get_meta_data(self, booking_id: str) -&gt; list[MetaData]",desc:"Booking custom-field metadata (its field responses); <code>[]</code> when the booking is not found or has no matching fields.",notes:"Validates the booking id. Returns only fields whose slug starts with <code>integrators:&lt;integrator&gt;:</code> (set on the service via <code>get_booking_service(integrator=None)</code>), with that prefix stripped from the returned slug. Guest-value identity fields (name/email/DOB) are <code>None</code> when PII is off."},
+     {name:"set_meta_data_guest",sig:"async def set_meta_data_guest(self, booking_id: str, guests: Sequence[SetMetaDataGuestInput]) -&gt; SetMetaDataResult",desc:"Upserts the <code>guest</code> metadata field.",notes:"Each guest requires <code>name</code> + <code>email</code> (<code>date_of_birth</code>/<code>waiver_signed</code>/<code>notes</code> optional). Scoped to the service <code>integrator</code>; raises <code>ValueError</code> on an invalid booking id or an empty guest list."},
+     {name:"set_meta_data_attachment",sig:"async def set_meta_data_attachment(self, booking_id: str, attachments: Sequence[SetMetaDataAttachmentInput]) -&gt; SetMetaDataResult",desc:"Upserts the <code>attachment</code> metadata field.",notes:"Each attachment requires <code>name</code> + <code>attachment_url</code>. Raises <code>ValueError</code> on an invalid booking id or an empty list."},
+     {name:"set_meta_data_manifest_url",sig:"async def set_meta_data_manifest_url(self, booking_id: str, url: str) -&gt; SetMetaDataResult",desc:"Upserts the <code>manifest_url</code> metadata field.",notes:"<code>url</code> must be a non-empty string."},
+     {name:"set_meta_data_reservation_id",sig:"async def set_meta_data_reservation_id(self, booking_id: str, reservation_id: str) -&gt; SetMetaDataResult",desc:"Upserts the <code>reservation_id</code> metadata field (as shortText).",notes:"<code>reservation_id</code> must be a non-empty string."},
+     {name:"set_meta_data_booking_status",sig:"async def set_meta_data_booking_status(self, booking_id: str, status: str) -&gt; SetMetaDataResult",desc:"Upserts the <code>booking_status</code> metadata field (as shortText).",notes:"<code>status</code> must be a non-empty string."},
+     {name:"set_meta_data_assigned_product",sig:"async def set_meta_data_assigned_product(self, booking_id: str, product_name: str) -&gt; SetMetaDataResult",desc:"Upserts the <code>assigned_product</code> metadata field (as shortText).",notes:"<code>product_name</code> must be a non-empty string."},
+     {name:"set_meta_data_assigned_employee",sig:"async def set_meta_data_assigned_employee(self, booking_id: str, employee_name: str) -&gt; SetMetaDataResult",desc:"Upserts the <code>assigned_employee</code> metadata field (as shortText).",notes:"<code>employee_name</code> must be a non-empty string."},
+     {name:"set_meta_data_insurance_purchased",sig:"async def set_meta_data_insurance_purchased(self, booking_id: str, insurance_purchased: bool) -&gt; SetMetaDataResult",desc:"Upserts the <code>insurance_purchased</code> metadata field (as boolean).",notes:"<code>insurance_purchased</code> must be a <code>bool</code>. All setters return a <code>SetMetaDataResult</code> (<code>success</code>/<code>booking_id</code>/<code>message</code>); not PII-gated."},
+     {name:"get_payments_on_file",pii:true,sig:"async def get_payments_on_file(self, booking_id: str) -&gt; BookingPaymentsOnFile | None",desc:"Payments on file, or <code>None</code>.",notes:"Validates the booking id."},
+     {name:"append_note",sig:"async def append_note(self, booking_id: str, note: str, mode: NoteMode = \"append\") -&gt; Booking | None",desc:"Appends to or overwrites operator notes; returns the updated booking or <code>None</code>.",notes:"<code>mode</code> defaults to <code>\"append\"</code>. Fetches the booking first; <code>None</code> when not found."},
+     {name:"set_checkin_status",sig:"async def set_checkin_status(self, booking_id: str, checked_in: bool) -&gt; Booking | None",desc:"Sets check-in status; returns the refreshed booking or <code>None</code>.",notes:"Sets the check-in time to now (UTC ISO) or clears it."},
+     {name:"update_custom_status",sig:"async def update_custom_status(self, booking_id: str, custom_status: str) -&gt; bool",desc:"Sets the booking's operator-facing custom status; returns <code>True</code> when Peek confirms the stored status equals the requested one.",notes:"Raises <code>ValueError</code> on an invalid booking id or when <code>custom_status</code> is not a non-empty (non-whitespace) string, before any network call. Not PII-gated."},
+     {name:"cancel",sig:"async def cancel(self, booking_id: str, notes: str = \"Canceled\") -&gt; CancelBookingResult",desc:"Cancels a booking.",notes:"<code>notes</code> defaults to <code>\"Canceled\"</code>. Raises <code>ValueError</code> when no booking data is returned."},
+     {name:"make_payment",pii:true,sig:"async def make_payment(self, payment: MakePaymentInput) -&gt; MakePaymentResult",desc:"Charges a booking.",notes:"Validates: <code>payment_source_id</code> starts with <code>ps_</code> or is <code>cash/cash</code>/<code>custom/other</code>/<code>custom/voucher</code>; <code>amount</code> numeric; <code>currency</code> 3-letter uppercase; <code>idempotency_key</code> non-empty; booking id valid. Resolves the order + source via payments-on-file. Raises <code>ValueError</code> when the booking/source is not found or the charge fails."},
+     {name:"refund",pii:true,sig:"async def refund(self, refund: RefundInput) -&gt; RefundResult",desc:"Refunds a booking payment.",notes:"Validates <code>payment_id</code> starts with <code>pmt_</code>, amount/currency/idempotency key, booking id. Raises <code>ValueError</code> when the booking/payment is not found or the refund fails."},
+     {name:"create_invoice_link",pii:true,sig:"async def create_invoice_link(self, booking_id: str) -&gt; InvoiceLinkResult",desc:"Creates an invoice link for the booking's order.",notes:"Raises <code>ValueError</code> when the booking/order is not found or link creation fails."},
+     {name:"list_addons",sig:"async def list_addons(self, booking_id: str) -&gt; BookingAddons",desc:"Add-ons on a booking, grouped by add-on item.",notes:"Validates the booking id; raises <code>ValueError</code> when the booking is not found or multiple bookings match."},
+     {name:"add_addon",pii:true,sig:"async def add_addon(self, booking_id: str, addon: AddAddonInput) -&gt; BookingAddonsMutationResult",desc:"Adds an add-on (create quote from order → update quote → amend order).",notes:"<code>quantity</code> must be a positive-integer string; <code>addon_option_id</code> is required. Resolves the parent item via the product service (concurrently with the booking's add-on read); reuses a non-canceled add-on's item refid. Raises <code>ValueError</code> on a missing option id, invalid quantity, add-on not found, or any mutation failure."},
+     {name:"remove_addon",pii:true,sig:"async def remove_addon(self, booking_id: str, addon: AddAddonInput) -&gt; BookingAddonsMutationResult",desc:"Removes (cancels) add-on options.",notes:"Same three mutations with cancellation variables; cancels up to <code>quantity</code> confirmed options; marks the parent canceled only when all its options are canceled. Raises <code>ValueError</code> when no matching confirmed option is found."},
+     {name:"create",sig:"async def create(self, booking: CreateBookingInput) -&gt; CreatedBooking",desc:"Creates a booking (create quote → create order from quote), optionally marking it paid.",notes:"Validates: <code>activity_id</code>, <code>availability_time_id</code>, ≥1 ticket with <code>resource_option_id</code> + positive quantity, guest <code>name</code>; <code>idempotency_key</code> required when <code>mark_as_paid</code>; <code>parent_order_id</code> (if set) must be a valid order id. Resolves + validates custom-question answers (and a malformed <code>list_price</code>) before creating anything. Raises <code>ValueError</code> on validation or quote/order failures."}
+   ]
+  },
+  {
+   name:"ReviewService",
+   file:"src/peek_app_utilities/internal/peek/reviews/review_service.py",
+   desc:"Review operations. Receives the resolved access options (reviewer PII on/off) from the access service.",
+   obtain:"PeekAccessService.get_review_service()",
+   methods:[
+     {name:"get_reviews",sig:"async def get_reviews(self, product_id: str, review_count: int = 50, review_offset: int = 0) -&gt; list[Review]",desc:"Up to <code>review_count</code> reviews for an activity, newest-first, skipping the <code>review_offset</code> newest.",notes:"<code>review_count</code> default 50 (validated: an <code>int</code> in 1–50); <code>review_offset</code> default 0 (validated: a non-negative <code>int</code>). Single-page fetch via the connection cursor. Reviewer <code>customer_name</code>/<code>customer_email</code> are <code>None</code> when PII is off. Raises <code>ValueError</code> on an empty <code>product_id</code>, invalid count, or invalid offset."},
+     {name:"get_all_review_summaries",sig:"async def get_all_review_summaries(self) -&gt; list[ProductReviewSummary]",desc:"Aggregate review statistics for every activity — average rating and per-star counts.",notes:"Reads the same activity list as <code>get_all_products</code>. Carries no per-review detail or PII, so it is unaffected by the PII switch. An activity with no reviews returns a <code>None</code> <code>avg_rating</code> and zero counts."}
+   ]
+  }
+ ],
+ models:[
+  {name:"Logger",kind:"protocol",file:"src/peek_app_utilities/logger.py",
+   desc:"Optional structured logger passed via the access-service config's <code>logger</code> field — any object with these three methods satisfies it. <code>noop_logger</code> (a silent implementation) is the exported default; <code>logging_adapter(logger: logging.Logger)</code> wraps a standard-library logger (the context mapping goes out as <code>extra={\"context\": {…}}</code>).",
+   fields:[
+    {name:"info",type:"(message: str, context: Mapping[str, Any] | None = None) -&gt; None",n:false,desc:"Informational log."},
+    {name:"warn",type:"(message: str, context: Mapping[str, Any] | None = None) -&gt; None",n:false,desc:"Warning log."},
+    {name:"error",type:"(message: str, context: Mapping[str, Any] | None = None) -&gt; None",n:false,desc:"Error log."}
+   ]},
+  {name:"PeekAuthTokenClaims",kind:"dataclass",file:"src/peek_app_utilities/models/peek/auth_token.py",
+   desc:"Verified claims returned by <code>PeekAccessService.verify_peek_auth_token</code>. The <code>install_id</code> here is how you obtain the value to configure an access service.",
+   fields:[
+    {name:"install_id",type:"str",n:false,desc:"Install id the token was minted for (the JWT <code>sub</code>) — use it as the access-service <code>install_id</code>."},
+    {name:"display_version",type:"str",n:false,desc:"App display version from the token."},
+    {name:"user",type:"PeekAuthTokenUser | None",n:true,desc:"Authenticated user context, or <code>None</code> when the token carries no user block."}
+   ]},
+  {name:"PeekAuthTokenUser",kind:"dataclass",file:"src/peek_app_utilities/models/peek/auth_token.py",
+   desc:"Authenticated user context on a verified token. Every field is nullable — the token is untrusted even after signature verification; absent claims and the sentinels <code>\"\"</code>/<code>\"null\"</code> become <code>None</code>.",
+   fields:[
+    {name:"email",type:"str | None",n:true,desc:"User email, or <code>None</code>."},
+    {name:"id",type:"str | None",n:true,desc:"The user's own Peek user id (identifies the person, not their account), or <code>None</code>."},
+    {name:"is_admin",type:"bool | None",n:true,desc:"Whether the user has admin privileges, or <code>None</code> if omitted."},
+    {name:"locale",type:"str | None",n:true,desc:"User locale (e.g. <code>en</code>), or <code>None</code>."},
+    {name:"name",type:"str | None",n:true,desc:"User name, or <code>None</code>."},
+    {name:"platform",type:"PeekPlatform | None",n:true,desc:"Platform that embedded the app, or <code>None</code> when omitted or unrecognized."}
+   ]},
+  {name:"PeekPlatform",kind:"type",file:"src/peek_app_utilities/models/peek/auth_token.py",
+   desc:"Platform that embedded the app for the session — the single claim identifying which brand a request came from. Sibling const: <code>PEEK_PLATFORMS = (\"peek\", \"cng\", \"acme\")</code>.",def:'Literal["peek", "cng", "acme"]'},
+  {name:"AddAddonInput",kind:"input",file:"src/peek_app_utilities/internal/peek/bookings/booking_service.py",
+   desc:"Input to <code>BookingService.add_addon</code> / <code>remove_addon</code>.",
+   fields:[
+    {name:"quantity",type:"str",n:false,desc:"Positive-integer quantity string (<code>\"1\"</code>, <code>\"2\"</code>, …)."},
+    {name:"addon_option_id",type:"str | None",n:"opt",desc:"Item option id to add/remove — a ticket id on an <code>ADD-ON</code> product from <code>ProductService.get_all_products</code>. Optional in the dataclass, but the service raises <code>ValueError</code> when it is missing or blank."}
+   ]},
+  {name:"CancelBookingResult",kind:"dataclass",file:"src/peek_app_utilities/internal/peek/bookings/booking_service.py",
+   desc:"Result of <code>BookingService.cancel</code>.",
+   fields:[
+    {name:"id",type:"str",n:false,desc:"Booking id."},
+    {name:"display_id",type:"str",n:false,desc:"Human-facing display id."},
+    {name:"reservation_status",type:"str",n:false,desc:"Reservation status after cancellation."}
+   ]},
+  {name:"BookingSearchBy",kind:"type",file:"src/peek_app_utilities/models/peek/booking.py",
+   desc:"Which date <code>search_by_time_range</code> filters on.",def:'Literal["purchaseDate", "activityDate"]'},
+  {name:"NoteMode",kind:"type",file:"src/peek_app_utilities/models/peek/booking.py",
+   desc:"How <code>append_note</code> writes the note.",def:'Literal["append", "overwrite"]'},
+  {name:"ResourcePoolMode",kind:"type",file:"src/peek_app_utilities/models/peek/resource_pool.py",
+   desc:"Mode filter for <code>ResourcePoolService.get_all</code>.",def:'Literal["ACTIVITY", "ALL"]'},
+  {name:"TimeslotFilter",kind:"type",file:"src/peek_app_utilities/models/peek/timeslot.py",
+   desc:"Timeslot filter for <code>TimeslotService.get_for_day</code>.",def:'Literal["all", "withBookings", "withoutBookings"]'},
+  {name:"GatewayMode",kind:"type",file:"src/peek_app_utilities/access_service_config.py",
+   desc:"The only explicit gateway mode <code>PeekAccessServiceConfig.mode</code> accepts (legacy v2 routing). Leave <code>mode</code> unset and pass <code>api_url</code> instead. Import from <code>peek_app_utilities.access_service_config</code>.",def:'Literal["v2"]'},
+  {name:"PeekAccessServiceConfig",kind:"config",file:"src/peek_app_utilities/peek_access_service.py",extends:"BaseAccessServiceConfig",
+   desc:"Constructor config for <code>PeekAccessService</code> — a frozen, keyword-only dataclass. Adds the Peek-only fields below; all other fields are inherited.",
+   fields:[
+    {name:"gateway_key",type:"str | None",n:"opt",desc:"API gateway key, sent as the <code>pk-api-key</code> header. Required in the legacy v1 mode (no <code>api_url</code>, no <code>mode=\"v2\"</code>); not used otherwise."},
+    {name:"mode",type:"GatewayMode | None",n:"opt",desc:"Gateway mode. <code>\"v2\"</code> routes through the app-registry installations API; <code>None</code> (default) is the legacy v1 backoffice route. <code>api_url</code>, when set, supersedes this."},
+    {name:"item_options_page_size",type:"int | None",n:"opt",desc:"Page size for cursor-paginated item options. Default 50."}
+   ]},
+  {name:"BaseAccessServiceConfig",kind:"config",file:"src/peek_app_utilities/access_service_config.py",
+   desc:"Shared constructor config for every access service (a frozen, keyword-only dataclass). <code>PeekAccessServiceConfig</code> extends it; <code>CngAccessServiceConfig</code> / <code>AcmeAccessServiceConfig</code> are plain aliases of it. Required fields raise <code>ValueError</code> from the constructor when empty.",
+   fields:[
+    {name:"install_id",type:"str",n:false,desc:"Install ID. Becomes the JWT subject. Required."},
+    {name:"jwt_secret",type:"str",n:false,desc:"HMAC secret used to sign the JWT. Required."},
+    {name:"issuer",type:"str",n:false,desc:"JWT issuer — the app name / app ID. Required."},
+    {name:"api_url",type:"str | None",n:"opt",desc:"The install's <b>base API URL</b> (persist the install webhook's <code>api_url</code>). Each service class appends its own backoffice slug (e.g. <code>peek_backoffice_api-v1</code>) when it calls, so different platforms route through different slugs. If the URL you pass already carries this platform's slug (dashes or underscores) it is stripped back to the base; a URL carrying a different platform's slug makes the constructor raise <code>ValueError</code>. No app-id segment is inserted (so <code>app_id</code> is not required). Preferred over <code>base_url</code>/<code>app_id</code>."},
+    {name:"app_id",type:"str | None",n:"opt",desc:"<b>Deprecated.</b> App ID inserted into the endpoint path. Required only in legacy <code>base_url</code> mode."},
+    {name:"base_url",type:"str | None",n:"opt",desc:"<b>Deprecated.</b> Override the base URL (per-service default). Prefer <code>api_url</code>."},
+    {name:"token_ttl_seconds",type:"int | None",n:"opt",desc:"JWT lifetime in seconds. Default 3600."},
+    {name:"token_refresh_leeway_seconds",type:"int | None",n:"opt",desc:"Re-mint the cached token this many seconds before expiry. Default 60."},
+    {name:"retry_delays_ms",type:"Sequence[int] | None",n:"opt",desc:"Backoff delays (ms) for HTTP 429 retries. Default <code>(1000, 2000, 4000)</code>."},
+    {name:"logger",type:"Logger | None",n:"opt",desc:"Optional logger. Default no-op (silent)."},
+    {name:"http_client",type:"httpx.AsyncClient | None",n:"opt",desc:"Custom <code>httpx.AsyncClient</code>. Default one owned by the access service (closed by <code>aclose()</code> / <code>async with</code>). A caller-supplied client is never closed by the package."},
+    {name:"access_options",type:"AccessOptions | None",n:"opt",desc:"Cross-cutting access options (PII exposure). Defaults to <code>full_customer_access=False</code>. Threaded to the resource services that read customer data."}
+   ]},
+  {name:"Product",kind:"dataclass",file:"src/peek_app_utilities/models/peek/product.py",
+   desc:"A bookable product (activity, rental, or add-on). Consts: <code>ACTIVITY_PRODUCT_TYPE=\"ACTIVITY\"</code>, <code>RENTAL_PRODUCT_TYPE=\"RENTAL\"</code>, <code>ADD_ON_PRODUCT_TYPE=\"ADD-ON\"</code>.",
+   fields:[
+    {name:"product_id",type:"str",n:false,desc:"Stable id (activity: id, falling back to the legacy id; add-on: parent item id)."},
+    {name:"name",type:"str",n:false,desc:"Display name."},
+    {name:"type",type:"str",n:false,desc:"Peek type for activities; always <code>ADD-ON</code> for add-ons."},
+    {name:"color",type:"str",n:false,desc:"Hex color; add-ons default <code>#FFFFFF</code>; empty string if none."},
+    {name:"currency",type:"str",n:false,desc:"ISO 4217 code; empty string for add-ons / when none."},
+    {name:"image_url",type:"str | None",n:true,desc:"Primary image; <code>None</code> for add-ons / when none."},
+    {name:"description",type:"str | None",n:true,desc:"Long description (may contain HTML); <code>None</code> for add-ons / when none."},
+    {name:"meeting_location",type:"ProductMeetingLocation | None",n:true,desc:"Meeting point; <code>None</code> for add-ons / when Peek reports none."},
+    {name:"tickets",type:"list[ProductTicket]",n:false,desc:"Bookable sub-options (resource options or add-on item options)."}
+   ]},
+  {name:"ProductMeetingLocation",kind:"dataclass",file:"src/peek_app_utilities/models/peek/product.py",desc:"Meeting point. Every field nullable.",
+   fields:[
+    {name:"summary",type:"str | None",n:true,desc:"Free-text meeting instructions."},
+    {name:"address",type:"str | None",n:true,desc:"Formatted postal address."},
+    {name:"url",type:"str | None",n:true,desc:"Map/link URL."}
+   ]},
+  {name:"ProductTicket",kind:"dataclass",file:"src/peek_app_utilities/models/peek/product.py",desc:"A bookable sub-option.",
+   fields:[
+    {name:"id",type:"str",n:false,desc:"Ticket/option id. Also the <code>resource_option_id</code> — pass it as a ticket's <code>resource_option_id</code> on <code>CreateBookingTicket</code>; <code>AvailabilityService.get_availability_times</code> reports it per slot."},
+    {name:"name",type:"str",n:false,desc:"Ticket/option name."},
+    {name:"min_price",type:"PricingMoney | None",n:true,desc:"Lowest price across the range; <code>None</code> for add-ons / when none."},
+    {name:"max_price",type:"PricingMoney | None",n:true,desc:"Highest price across the range; <code>None</code> for add-ons / when none."}
+   ]},
+  {name:"CustomQuestion",kind:"dataclass",file:"src/peek_app_utilities/models/peek/custom_question.py",desc:"A custom question configured on an activity (definition, no PII).",
+   fields:[
+    {name:"id",type:"str",n:false,desc:"Question id (e.g. <code>cq_anq67</code>)."},
+    {name:"order",type:"int",n:false,desc:"1-based position in the activity's question list."},
+    {name:"is_required",type:"bool",n:false,desc:"Whether an answer is required."},
+    {name:"question_text",type:"str",n:false,desc:"Prompt shown to the guest (Peek <code>text</code>)."},
+    {name:"hint_text",type:"str | None",n:true,desc:"Helper/hint text, or <code>None</code>."},
+    {name:"question_type",type:"str",n:false,desc:"Input type (e.g. <code>CHECK_BOX</code>, <code>TEXT</code>, <code>LOCATION</code>, <code>SELECT_ONE</code>)."},
+    {name:"internal_label",type:"str | None",n:true,desc:"Operator-only label, or <code>None</code>."},
+    {name:"per_guest",type:"bool",n:false,desc:"Answered once per guest vs per booking."},
+    {name:"default_value",type:"str | None",n:true,desc:"Pre-filled default answer, or <code>None</code>."},
+    {name:"options",type:"list[CustomQuestionOption]",n:false,desc:"Choice options; empty for free-text/checkbox."}
+   ]},
+  {name:"CustomQuestionOption",kind:"dataclass",file:"src/peek_app_utilities/models/peek/custom_question.py",desc:"A choice option on a custom question.",
+   fields:[
+    {name:"id",type:"str",n:false,desc:"Option id (e.g. <code>cqao_mwdgvw</code>)."},
+    {name:"order",type:"int",n:false,desc:"1-based position in the option list."},
+    {name:"value",type:"str",n:false,desc:"Display label (Peek <code>text</code>)."}
+   ]},
+  {name:"AccountUser",kind:"dataclass",file:"src/peek_app_utilities/models/peek/account_user.py",desc:"Active staff member / guide.",
+   fields:[
+    {name:"id",type:"str",n:false,desc:"Account user id."},
+    {name:"name",type:"str",n:false,desc:"Full name."},
+    {name:"email",type:"str",n:false,desc:"Email."},
+    {name:"phone",type:"str",n:false,desc:"Phone."},
+    {name:"assigned_activities",type:"list[AssignedActivity]",n:false,desc:"Activities the user is assigned to."}
+   ]},
+  {name:"AssignedActivity",kind:"dataclass",file:"src/peek_app_utilities/models/peek/account_user.py",desc:"An activity an account user is assigned to.",
+   fields:[
+    {name:"id",type:"str",n:false,desc:"Activity (product) id."},
+    {name:"name",type:"str",n:false,desc:"Activity name."}
+   ]},
+  {name:"ResourcePool",kind:"dataclass",file:"src/peek_app_utilities/models/peek/resource_pool.py",desc:"A pool of allocatable resources.",
+   fields:[
+    {name:"id",type:"str",n:false,desc:"Pool id."},
+    {name:"name",type:"str",n:false,desc:"Display name."},
+    {name:"image_url",type:"str | None",n:true,desc:"Image URL, or <code>None</code>."},
+    {name:"mode",type:"str",n:false,desc:"Allocation mode reported by Peek."},
+    {name:"color_hex",type:"str | None",n:true,desc:"Hex color, or <code>None</code>."},
+    {name:"quantity",type:"int | None",n:true,desc:"Configured quantity, or <code>None</code>."},
+    {name:"category",type:"str",n:false,desc:"Category (e.g. <code>guide</code>)."},
+    {name:"capacity",type:"int | None",n:true,desc:"Capacity, or <code>None</code>."},
+    {name:"resource_tracking_mode",type:"str | None",n:true,desc:"How the resource is tracked, or <code>None</code>."},
+    {name:"account_user",type:"ResourcePoolAccountUser | None",n:true,desc:"Backing account user, or <code>None</code>."}
+   ]},
+  {name:"ResourcePoolAccountUser",kind:"dataclass",file:"src/peek_app_utilities/models/peek/resource_pool.py",desc:"Account user backing a resource pool.",
+   fields:[
+    {name:"id",type:"str",n:false,desc:"Account user id."},
+    {name:"name",type:"str",n:false,desc:"Account user name."}
+   ]},
+  {name:"Timeslot",kind:"dataclass",file:"src/peek_app_utilities/models/peek/timeslot.py",desc:"A schedulable slot for an activity.",
+   fields:[
+    {name:"id",type:"str",n:false,desc:"Timeslot id."},
+    {name:"product_id",type:"str",n:false,desc:"Activity (product) id."},
+    {name:"total_capacity",type:"int",n:false,desc:"Total capacity."},
+    {name:"available_capacity",type:"int",n:false,desc:"Remaining capacity."},
+    {name:"max_party_size",type:"int",n:false,desc:"Max party size per booking."},
+    {name:"booking_count",type:"int",n:false,desc:"Number of bookings."},
+    {name:"checked_in_count",type:"int",n:false,desc:"Number of checked-in guests."},
+    {name:"status",type:"str",n:false,desc:"Status (e.g. open/closed)."},
+    {name:"notes",type:"str | None",n:true,desc:"Manifest notes, or <code>None</code>."},
+    {name:"duration_min",type:"int",n:false,desc:"Duration in minutes."},
+    {name:"date",type:"str",n:false,desc:"Date (<code>YYYY-MM-DD</code>)."},
+    {name:"start_time",type:"str | None",n:true,desc:"Start time, or <code>None</code>."},
+    {name:"assigned_resources",type:"list[AssignedResource]",n:false,desc:"Allocated resources."}
+   ]},
+  {name:"AssignedResource",kind:"dataclass",file:"src/peek_app_utilities/models/peek/timeslot.py",desc:"A resource allocated to a timeslot.",
+   fields:[
+    {name:"name",type:"str",n:false,desc:"Pool name."},
+    {name:"capacity",type:"int",n:false,desc:"Pool capacity."},
+    {name:"category",type:"str",n:false,desc:"Pool category (e.g. <code>guide</code>)."},
+    {name:"quantity",type:"int",n:false,desc:"Allocated quantity."},
+    {name:"account_user_id",type:"str | None",n:true,desc:"Backing account user id, or <code>None</code>."}
+   ]},
+  {name:"UpdateTimeslotResult",kind:"dataclass",file:"src/peek_app_utilities/models/peek/timeslot.py",desc:"Result of a <code>set_availability</code>/<code>set_notes</code> update.",
+   fields:[
+    {name:"manifest_notes",type:"str | None",n:true,desc:"Updated manifest notes."},
+    {name:"status",type:"str | None",n:true,desc:"Updated status."}
+   ]},
+  {name:"GuideAssignment",kind:"input",file:"src/peek_app_utilities/models/peek/timeslot.py",desc:"Input to <code>assign_guide</code>.",
+   fields:[
+    {name:"timeslot_ids",type:"Sequence[str]",n:false,desc:"Timeslots to (un)assign."},
+    {name:"guide_ids",type:"Sequence[str]",n:false,desc:"Guides — matched by pool id, account-user id, or name."},
+    {name:"action",type:"GuideAssignmentAction",n:false,desc:"Assign or unassign."}
+   ]},
+  {name:"GuideAssignmentAction",kind:"type",file:"src/peek_app_utilities/models/peek/timeslot.py",
+   desc:"Whether a <code>GuideAssignment</code> assigns or unassigns guides. Sibling const: <code>GUIDE_ASSIGNMENT_ACTIONS</code>. Import from <code>peek_app_utilities.models.peek.timeslot</code>.",def:'Literal["assign", "unassign"]'},
+  {name:"AssignGuideResult",kind:"dataclass",file:"src/peek_app_utilities/models/peek/timeslot.py",desc:"Result of <code>assign_guide</code>.",
+   fields:[
+    {name:"status",type:"AssignGuideStatus",n:false,desc:"Outcome."},
+    {name:"resource_allocation_request_id",type:"str | None",n:true,desc:"Created allocation request id on success, else <code>None</code>."},
+    {name:"errors",type:"list[AssignGuideError] | None",n:true,desc:"Error details on failure, else <code>None</code>."}
+   ]},
+  {name:"AssignGuideStatus",kind:"type",file:"src/peek_app_utilities/models/peek/timeslot.py",
+   desc:"Outcome of a guide (un)assignment request. Import from <code>peek_app_utilities.models.peek.timeslot</code>.",def:'Literal["success", "error"]'},
+  {name:"AssignGuideError",kind:"dataclass",file:"src/peek_app_utilities/models/peek/timeslot.py",desc:"A single error reported by a failed guide (un)assignment. Import from <code>peek_app_utilities.models.peek.timeslot</code>.",
+   fields:[{name:"message",type:"str",n:false,desc:"Error message from Peek (<code>\"Unknown error\"</code> when none)."}]},
+  {name:"Channel",kind:"dataclass",file:"src/peek_app_utilities/models/peek/channel.py",desc:"A reseller channel.",
+   fields:[
+    {name:"id",type:"str",n:false,desc:"Channel id."},
+    {name:"name",type:"str",n:false,desc:"Channel name."},
+    {name:"notes",type:"str | None",n:true,desc:"Free-text notes, or <code>None</code>."},
+    {name:"pricing_model",type:"str",n:false,desc:"Pricing model reported by Peek."},
+    {name:"state",type:"str",n:false,desc:"Channel state (active/inactive)."},
+    {name:"type",type:"str",n:false,desc:"Channel type."},
+    {name:"agents",type:"list[Agent]",n:false,desc:"Agents on this channel."}
+   ]},
+  {name:"Agent",kind:"dataclass",file:"src/peek_app_utilities/models/peek/channel.py",desc:"A reseller agent.",
+   fields:[
+    {name:"email",type:"str | None",n:true,desc:"Email, or <code>None</code>."},
+    {name:"name",type:"str",n:false,desc:"Agent name."},
+    {name:"internal_notes",type:"str | None",n:true,desc:"Internal notes, or <code>None</code>."},
+    {name:"phone",type:"str | None",n:true,desc:"Phone, or <code>None</code>."}
+   ]},
+  {name:"PromoCode",kind:"dataclass",file:"src/peek_app_utilities/models/peek/promo_code.py",desc:"A promo code.",
+   fields:[
+    {name:"id",type:"str",n:false,desc:"Promo code id."},
+    {name:"name",type:"str",n:false,desc:"Display name."},
+    {name:"percent_amount",type:"float | None",n:true,desc:"Percentage discount (0–100), or <code>None</code> for fixed-amount."},
+    {name:"per_ticket_discount",type:"bool",n:false,desc:"Whether the discount applies per ticket."},
+    {name:"redemption_code",type:"str",n:false,desc:"Code guests redeem."},
+    {name:"fixed_amount",type:"PromoCodeFixedAmount | None",n:true,desc:"Fixed discount, or <code>None</code> for a percentage code."}
+   ]},
+  {name:"PromoCodeFixedAmount",kind:"dataclass",file:"src/peek_app_utilities/models/peek/promo_code.py",desc:"Fixed discount amount on a promo code.",
+   fields:[
+    {name:"amount",type:"float",n:false,desc:"Amount as reported by Peek."},
+    {name:"currency",type:"str",n:false,desc:"ISO currency code."},
+    {name:"formatted",type:"str",n:false,desc:"Human-formatted amount (e.g. <code>$10.00</code>)."}
+   ]},
+  {name:"CreatePromoCodeInput",kind:"input",file:"src/peek_app_utilities/models/peek/promo_code.py",desc:"Input to <code>PromoCodeService.create</code>.",
+   fields:[
+    {name:"name",type:"str",n:false,desc:"Display name."},
+    {name:"code",type:"str",n:false,desc:"Redemption code."},
+    {name:"amount",type:"str",n:false,desc:"Discount amount as a string."},
+    {name:"discount_type",type:"PromoDiscountType",n:false,desc:"Percent vs fixed."},
+    {name:"max_redemptions",type:"int | None",n:"opt",desc:"Cap on total redemptions."},
+    {name:"currency",type:"str | None",n:"opt",desc:"ISO currency for fixed discounts (default <code>USD</code>)."}
+   ]},
+  {name:"PromoDiscountType",kind:"type",file:"src/peek_app_utilities/models/peek/promo_code.py",
+   desc:"Whether a promo-code amount is a percentage or a fixed monetary value. Sibling const: <code>PROMO_DISCOUNT_TYPES</code>. Import from <code>peek_app_utilities.models.peek.promo_code</code>.",def:'Literal["percent", "fixed"]'},
+  {name:"CreatedPromoCode",kind:"dataclass",file:"src/peek_app_utilities/models/peek/promo_code.py",desc:"Result of creating a promo code.",
+   fields:[
+    {name:"id",type:"str",n:false,desc:"New promo code id."},
+    {name:"name",type:"str",n:false,desc:"New promo code name."}
+   ]},
+  {name:"PricingMoney",kind:"dataclass",file:"src/peek_app_utilities/models/peek/pricing.py",desc:"A money value in the pricing domain.",
+   fields:[
+    {name:"amount",type:"str",n:false,desc:"Decimal string (e.g. <code>50.00</code>); never a number."},
+    {name:"currency",type:"str",n:false,desc:"ISO 4217 code."},
+    {name:"display_price",type:"str | None",n:"opt",desc:"Human display string; present on read-back values only — omit when building an override input."}
+   ]},
+  {name:"PricingNamedRef",kind:"dataclass",file:"src/peek_app_utilities/models/peek/pricing.py",desc:"An id+name reference to a Peek entity.",
+   fields:[
+    {name:"id",type:"str",n:false,desc:"Peek id."},
+    {name:"name",type:"str",n:false,desc:"Display name."}
+   ]},
+  {name:"CreateEngineInput",kind:"input",file:"src/peek_app_utilities/models/peek/pricing.py",desc:"Input to <code>create_engine</code>.",
+   fields:[
+    {name:"name",type:"str",n:false,desc:"Engine display name."},
+    {name:"activity_ids",type:"Sequence[str] | None",n:"opt",desc:"Scoped activity ids; omit/empty = all activities."}
+   ]},
+  {name:"CreatedPricingEngine",kind:"dataclass",file:"src/peek_app_utilities/models/peek/pricing.py",desc:"Result of <code>create_engine</code>.",
+   fields:[{name:"id",type:"str",n:false,desc:"New engine id."}]},
+  {name:"UpdateEngineInput",kind:"input",file:"src/peek_app_utilities/models/peek/pricing.py",desc:"Input to <code>update_engine</code>.",
+   fields:[
+    {name:"engine_id",type:"str",n:false,desc:"Engine to update."},
+    {name:"name",type:"str",n:false,desc:"New display name."},
+    {name:"activity_ids",type:"Sequence[str] | None",n:"opt",desc:"New scope; empty/omitted clears the filter."}
+   ]},
+  {name:"PricingEngine",kind:"dataclass",file:"src/peek_app_utilities/models/peek/pricing.py",desc:"A pricing engine.",
+   fields:[
+    {name:"id",type:"str",n:false,desc:"Engine id."},
+    {name:"name",type:"str",n:false,desc:"Engine display name."}
+   ]},
+  {name:"ResourceOptionOverride",kind:"union",file:"src/peek_app_utilities/models/peek/pricing.py",desc:"Per-ticket override. Discriminated union on <code>mode</code> — one dataclass per variant.",
+   def:"FixedResourceOptionOverride | PercentageResourceOptionOverride"},
+  {name:"FixedResourceOptionOverride",kind:"input",file:"src/peek_app_utilities/models/peek/pricing.py",desc:"A ticket (resource option) price override that <b>replaces</b> the ticket price outright. Import from <code>peek_app_utilities.models.peek.pricing</code>.",
+   fields:[
+    {name:"id",type:"str",n:false,desc:"The Peek resource-option (ticket) id being overridden."},
+    {name:"price",type:"PricingMoney",n:false,desc:"The replacement price (3-letter uppercase currency, numeric amount)."},
+    {name:"mode",type:'Literal["fixed"]',n:false,desc:"Discriminant; defaults to <code>\"fixed\"</code>."}
+   ]},
+  {name:"PercentageResourceOptionOverride",kind:"input",file:"src/peek_app_utilities/models/peek/pricing.py",desc:"A ticket (resource option) price override that <b>adjusts</b> the ticket price by a percentage. Import from <code>peek_app_utilities.models.peek.pricing</code>.",
+   fields:[
+    {name:"id",type:"str",n:false,desc:"The Peek resource-option (ticket) id being overridden."},
+    {name:"percentage_adjustment",type:"str",n:false,desc:"Decimal string, e.g. <code>\"-25\"</code> for 25% off. Must be <code>&gt; -100</code>."},
+    {name:"mode",type:'Literal["percentage"]',n:false,desc:"Discriminant; defaults to <code>\"percentage\"</code>."}
+   ]},
+  {name:"PricingOverrideFilter",kind:"union",file:"src/peek_app_utilities/models/peek/pricing.py",desc:"Filter gating when an override applies. An override may carry zero/one/both variants.",
+   def:"SpotsTakenFilter | StartTimeRangeFilter"},
+  {name:"SpotsTakenFilter",kind:"input",file:"src/peek_app_utilities/models/peek/pricing.py",desc:"Restricts an override by how many spots are already taken. Import from <code>peek_app_utilities.models.peek.pricing</code>.",
+   fields:[{name:"spots_taken",type:"SpotsTakenBounds",n:false,desc:"The inclusive spots-taken bounds."}]},
+  {name:"SpotsTakenBounds",kind:"input",file:"src/peek_app_utilities/models/peek/pricing.py",desc:"Bounds for a <code>SpotsTakenFilter</code>. <b>Zero-indexed spots-taken counts</b>, not ticket counts — \"from the 5th ticket onward\" is <code>SpotsTakenBounds(min_spots=4)</code>. Import from <code>peek_app_utilities.models.peek.pricing</code>.",
+   fields:[
+    {name:"min_spots",type:"int | None",n:"opt",desc:"Lower bound (inclusive) on spots already taken; <code>None</code> for none."},
+    {name:"max_spots",type:"int | None",n:"opt",desc:"Upper bound (inclusive) on spots already taken; <code>None</code> for none."}
+   ]},
+  {name:"StartTimeRangeFilter",kind:"input",file:"src/peek_app_utilities/models/peek/pricing.py",desc:"Restricts an override to a start-time window. Import from <code>peek_app_utilities.models.peek.pricing</code>.",
+   fields:[{name:"start_time_range",type:"str",n:false,desc:"PostgreSQL-style inclusive range string <code>\"[HH:MM:SS,HH:MM:SS]\"</code>."}]},
+  {name:"PricingOverride",kind:"input",file:"src/peek_app_utilities/models/peek/pricing.py",desc:"A single override entry.",
+   fields:[
+    {name:"order",type:"int",n:false,desc:"0-based precedence (lower evaluated first)."},
+    {name:"resource_options",type:"Sequence[ResourceOptionOverride]",n:false,desc:"Per-ticket overrides."},
+    {name:"filters",type:"Sequence[PricingOverrideFilter]",n:"opt",desc:"Filters gating when the entry applies. Default <code>()</code>."}
+   ]},
+  {name:"ActivityOverrides",kind:"input",file:"src/peek_app_utilities/models/peek/pricing.py",desc:"Overrides for one activity.",
+   fields:[
+    {name:"activity_id",type:"str",n:false,desc:"Activity the overrides apply to."},
+    {name:"overrides",type:"Sequence[PricingOverride]",n:false,desc:"Overrides; an empty list clears them."}
+   ]},
+  {name:"UpsertOverridesInput",kind:"input",file:"src/peek_app_utilities/models/peek/pricing.py",desc:"Input to <code>upsert_overrides</code>.",
+   fields:[
+    {name:"engine_id",type:"str",n:false,desc:"Engine to write to."},
+    {name:"date_range",type:"str",n:false,desc:"PostgreSQL-style inclusive range (e.g. <code>[2025-07-04,2025-07-04]</code>)."},
+    {name:"activities",type:"Sequence[ActivityOverrides]",n:false,desc:"One entry per activity written/cleared."}
+   ]},
+  {name:"ClearOverridesInput",kind:"input",file:"src/peek_app_utilities/models/peek/pricing.py",desc:"Input to <code>clear_overrides</code>.",
+   fields:[
+    {name:"engine_id",type:"str",n:false,desc:"Engine to clear on."},
+    {name:"date_range",type:"str",n:false,desc:"Date range to clear."},
+    {name:"activity_ids",type:"Sequence[str]",n:false,desc:"Activity ids to clear."}
+   ]},
+  {name:"ResolvedOverride",kind:"union",file:"src/peek_app_utilities/models/peek/pricing.py",desc:"Read-back resolved override. Union on <code>mode</code>, normalized to the same <code>mode</code>-tagged shape used on input.",
+   def:"ResolvedFixedOverride | ResolvedPercentageOverride"},
+  {name:"ResolvedFixedOverride",kind:"dataclass",file:"src/peek_app_utilities/models/peek/pricing.py",desc:"A ticket price override as resolved by Peek: a fixed replacement price. Import from <code>peek_app_utilities.models.peek.pricing</code>.",
+   fields:[
+    {name:"price",type:"PricingMoney",n:false,desc:"The resolved replacement price."},
+    {name:"mode",type:'Literal["fixed"]',n:false,desc:"Discriminant: <code>\"fixed\"</code>."}
+   ]},
+  {name:"ResolvedPercentageOverride",kind:"dataclass",file:"src/peek_app_utilities/models/peek/pricing.py",desc:"A ticket price override as resolved by Peek: a percentage adjustment. Import from <code>peek_app_utilities.models.peek.pricing</code>.",
+   fields:[
+    {name:"percentage_adjustment",type:"str",n:false,desc:"The resolved percentage adjustment as a decimal string."},
+    {name:"mode",type:'Literal["percentage"]',n:false,desc:"Discriminant: <code>\"percentage\"</code>."}
+   ]},
+  {name:"ResolvedResourceOption",kind:"dataclass",file:"src/peek_app_utilities/models/peek/pricing.py",desc:"A resolved per-ticket override.",
+   fields:[
+    {name:"resource_option",type:"PricingNamedRef",n:false,desc:"The ticket this override resolved for."},
+    {name:"override",type:"ResolvedOverride",n:false,desc:"Resolved fixed/percentage override."}
+   ]},
+  {name:"ResolvedPricingOverride",kind:"dataclass",file:"src/peek_app_utilities/models/peek/pricing.py",desc:"A resolved override entry as stored.",
+   fields:[
+    {name:"order",type:"int",n:false,desc:"Precedence index as stored."},
+    {name:"resource_options",type:"list[ResolvedResourceOption]",n:false,desc:"Resolved per-ticket overrides."},
+    {name:"filters",type:"list[PricingOverrideFilter]",n:false,desc:"Filters gating this override."}
+   ]},
+  {name:"PricingActivityContext",kind:"dataclass",file:"src/peek_app_utilities/models/peek/pricing.py",desc:"Resolved overrides for one activity+date under an engine.",
+   fields:[
+    {name:"date",type:"str",n:false,desc:"Date the context applies to (<code>YYYY-MM-DD</code>)."},
+    {name:"activity",type:"PricingNamedRef",n:false,desc:"Activity the overrides belong to."},
+    {name:"engine",type:"PricingNamedRef",n:false,desc:"Engine the overrides live under."},
+    {name:"overrides",type:"list[ResolvedPricingOverride]",n:false,desc:"Resolved overrides (empty when cleared)."}
+   ]},
+  {name:"UpsertOverridesResult",kind:"dataclass",file:"src/peek_app_utilities/models/peek/pricing.py",desc:"Result of upsert/clear overrides.",
+   fields:[{name:"activity_contexts",type:"list[PricingActivityContext]",n:false,desc:"One entry per activity written/cleared."}]},
+  {name:"DailyNote",kind:"dataclass",file:"src/peek_app_utilities/models/peek/daily_note.py",desc:"The operator's daily note.",
+   fields:[{name:"note",type:"str",n:false,desc:"The note text."}]},
+  {name:"AvailabilityTime",kind:"dataclass",file:"src/peek_app_utilities/models/peek/availability_time.py",desc:"A single available time slot with per-option availability.",
+   fields:[
+    {name:"id",type:"str",n:false,desc:"Slot id — the <code>availability_time_id</code> to book with."},
+    {name:"time",type:"str",n:false,desc:"Human-readable time label (e.g. <code>10:00 AM</code>)."},
+    {name:"from_",type:"str",n:false,desc:"Slot start (ISO datetime). Named <code>from_</code> because <code>from</code> is a Python keyword."},
+    {name:"end",type:"str",n:false,desc:"Slot end (ISO datetime)."},
+    {name:"duration",type:"Duration",n:false,desc:"Slot length."},
+    {name:"status",type:"str",n:false,desc:"Availability status (open/closed/sold-out)."},
+    {name:"availability",type:"list[Availability]",n:false,desc:"Remaining availability per resource option."}
+   ]},
+  {name:"Duration",kind:"dataclass",file:"src/peek_app_utilities/models/peek/availability_time.py",desc:"A duration label + numeric length.",
+   fields:[
+    {name:"name",type:"str",n:false,desc:"Human-readable duration name (e.g. <code>1 hour</code>)."},
+    {name:"length",type:"DurationLength",n:false,desc:"Numeric length + unit."}
+   ]},
+  {name:"DurationLength",kind:"dataclass",file:"src/peek_app_utilities/models/peek/availability_time.py",desc:"The numeric length of a <code>Duration</code> paired with its unit. Import from <code>peek_app_utilities.models.peek.availability_time</code>.",
+   fields:[
+    {name:"amount",type:"int",n:false,desc:"Quantity of <code>unit</code> (e.g. <code>60</code>)."},
+    {name:"unit",type:"str",n:false,desc:"Unit of <code>amount</code> (e.g. <code>minutes</code>)."}
+   ]},
+  {name:"Availability",kind:"dataclass",file:"src/peek_app_utilities/models/peek/availability_time.py",desc:"Remaining availability for one resource option.",
+   fields:[
+    {name:"qty",type:"int",n:false,desc:"Total capacity of the resource option for the slot."},
+    {name:"taken",type:"int",n:false,desc:"How much of <code>qty</code> is taken."},
+    {name:"resource_option_id",type:"str",n:false,desc:"The resource option."}
+   ]},
+  {name:"ResourceOptionQuantity",kind:"input",file:"src/peek_app_utilities/models/peek/availability_time.py",desc:"An option + quantity to check availability for.",
+   fields:[
+    {name:"resource_option_id",type:"str",n:false,desc:"Resource option to check."},
+    {name:"quantity",type:"int",n:false,desc:"Units to check availability for."}
+   ]},
+  {name:"AvailabilityTimesQuery",kind:"input",file:"src/peek_app_utilities/models/peek/availability_time.py",desc:"Input to <code>get_availability_times</code>.",
+   fields:[
+    {name:"activity_id",type:"str",n:false,desc:"Activity (product) id."},
+    {name:"date",type:"str",n:false,desc:"Date (<code>YYYY-MM-DD</code>)."},
+    {name:"resource_option_quantities",type:"Sequence[ResourceOptionQuantity]",n:false,desc:"Options + quantities to check."}
+   ]},
+  {name:"Membership",kind:"dataclass",file:"src/peek_app_utilities/models/peek/membership.py",desc:"A flattened membership variant record.",
+   fields:[
+    {name:"id",type:"str",n:false,desc:"Parent membership id."},
+    {name:"membership_variant_id",type:"str",n:false,desc:"Variant id."},
+    {name:"description",type:"str | None",n:true,desc:"Variant description, or <code>None</code>."},
+    {name:"external_name",type:"str",n:false,desc:"Customer-facing name."},
+    {name:"image_url",type:"str | None",n:true,desc:"Variant image URL, or <code>None</code>."},
+    {name:"internal_name",type:"str",n:false,desc:"Internal name."},
+    {name:"display_name",type:"str",n:false,desc:"Parent membership display name."}
+   ]},
+  {name:"MembershipPurchaseInput",kind:"input",file:"src/peek_app_utilities/models/peek/membership.py",desc:"Input to <code>MembershipService.purchase</code>.",
+   fields:[
+    {name:"membership_variant_id",type:"str",n:false,desc:"Variant to purchase."},
+    {name:"email",type:"str",n:false,desc:"Member email (required)."},
+    {name:"country",type:"str | None",n:"opt",desc:"ISO country code (2 letters)."},
+    {name:"formatted_address",type:"str | None",n:"opt",desc:"Formatted address."},
+    {name:"membership_code",type:"str | None",n:"opt",desc:"Membership code."},
+    {name:"phone",type:"str | None",n:"opt",desc:"Member phone."},
+    {name:"name",type:"str | None",n:"opt",desc:"Member name."}
+   ]},
+  {name:"PurchasedMembership",kind:"dataclass",file:"src/peek_app_utilities/models/peek/membership.py",desc:"Result of <code>purchase</code>.",
+   fields:[
+    {name:"order_id",type:"str",n:false,desc:"Order id."},
+    {name:"membership_id",type:"str",n:false,desc:"Membership sale id."},
+    {name:"display_id",type:"str",n:false,desc:"Human-facing display id."},
+    {name:"primary_member_id",type:"str | None",n:true,desc:"Primary member id, or <code>None</code>."},
+    {name:"primary_member_name",type:"str | None",n:true,desc:"Primary member name, or <code>None</code>."},
+    {name:"balance_amount",type:"str",n:false,desc:"Balance amount (numeric string; default <code>0.00</code>)."},
+    {name:"balance_currency",type:"str",n:false,desc:"Balance currency (default <code>USD</code>)."},
+    {name:"balance_formatted",type:"str",n:false,desc:"Balance formatted (default <code>$0.00</code>)."}
+   ]},
+  {name:"MetaData",kind:"dataclass",file:"src/peek_app_utilities/models/peek/booking_metadata.py",desc:"A single booking custom-field response, returned (as a list) by <code>BookingService.get_meta_data</code>. Flattens the field definition, its prompt, and the response <code>refid</code>, plus a display-safe <code>display_value</code> and one typed <code>value</code>.",
+   fields:[
+    {name:"id",type:"str",n:false,desc:"Field definition id."},
+    {name:"name",type:"str",n:false,desc:"Field name (human label)."},
+    {name:"slug",type:"str",n:false,desc:"Field slug without the <code>integrators:&lt;integrator&gt;:</code> prefix."},
+    {name:"type",type:"str",n:false,desc:"Raw field type reported by Peek."},
+    {name:"prompt",type:"str | None",n:true,desc:"Prompt label, or <code>None</code> when the field has no prompt."},
+    {name:"prompt_hint",type:"str | None",n:true,desc:"Prompt hint text, or <code>None</code>."},
+    {name:"is_required",type:"bool",n:false,desc:"Whether the field is required (<code>False</code> when no prompt)."},
+    {name:"refid",type:"str",n:false,desc:"The response's reference id."},
+    {name:"display_value",type:"str",n:false,desc:"Display-safe human string rendering of the value. Always present — <code>\"\"</code> when the value is absent or an unrecognized variant; the <code>html</code> value's rendering is HTML-escaped."},
+    {name:"value",type:"MetaDataValue | None",n:true,desc:"Typed response value, or <code>None</code> when absent or an unrecognized variant."}
+   ]},
+  {name:"MetaDataValue",kind:"union",file:"src/peek_app_utilities/models/peek/booking_metadata.py",
+   desc:"Discriminated union (keyed by <code>kind</code>) of a booking custom-field value — one frozen dataclass per Peek field-response variant; narrow with <code>match value: case MetaDataGuestValue(): …</code> or on <code>value.kind</code>. <code>Int</code> → <code>int</code>; <code>Decimal</code> → <code>str</code>; <code>Date</code>/<code>Time</code> → ISO string. The display-safe rendering lives on the parent <code>MetaData.display_value</code>, not on the variants. The variant classes are importable from <code>peek_app_utilities.models.peek.booking_metadata</code>.",
+   def:"  MetaDataAgeValue | MetaDataAttachmentValue | MetaDataBarcodeValue | MetaDataBooleanValue\n| MetaDataCheckboxValue | MetaDataCurrencyValue | MetaDataDateValue | MetaDataDecimalValue\n| MetaDataDurationValue | MetaDataEmailValue | MetaDataGuestValue | MetaDataHtmlValue\n| MetaDataImageUrlValue | MetaDataIntegerValue | MetaDataLocationValue | MetaDataLongTextValue\n| MetaDataMetaValue | MetaDataPercentValue | MetaDataPhoneValue | MetaDataShortTextValue\n| MetaDataTimeValue | MetaDataUrlValue | MetaDataVolumeValue | MetaDataWeightValue"},
+  {name:"MetaDataAgeValue",kind:"dataclass",file:"src/peek_app_utilities/models/peek/booking_metadata.py",desc:"<code>MetaDataValue</code> variant: an age.",
+   fields:[{name:"kind",type:'Literal["age"]',n:false,desc:"Discriminant."},{name:"age",type:"int",n:false,desc:"Age in years."}]},
+  {name:"MetaDataAttachmentValue",kind:"dataclass",file:"src/peek_app_utilities/models/peek/booking_metadata.py",desc:"<code>MetaDataValue</code> variant: an attached file.",
+   fields:[{name:"kind",type:'Literal["attachment"]',n:false,desc:"Discriminant."},{name:"attachment_url",type:"str",n:false,desc:"URL of the attachment."},{name:"mime",type:"str | None",n:true,desc:"MIME type, or <code>None</code>."},{name:"name",type:"str | None",n:true,desc:"File name, or <code>None</code>."},{name:"size",type:"int | None",n:true,desc:"Size in bytes, or <code>None</code>."}]},
+  {name:"MetaDataBarcodeValue",kind:"dataclass",file:"src/peek_app_utilities/models/peek/booking_metadata.py",desc:"<code>MetaDataValue</code> variant: a barcode.",
+   fields:[{name:"kind",type:'Literal["barcode"]',n:false,desc:"Discriminant."},{name:"barcode_type",type:"MetaDataBarcodeType | None",n:true,desc:"Symbology, or <code>None</code>."},{name:"barcode_value",type:"str",n:false,desc:"Encoded value."}]},
+  {name:"MetaDataBooleanValue",kind:"dataclass",file:"src/peek_app_utilities/models/peek/booking_metadata.py",desc:"<code>MetaDataValue</code> variant: a boolean.",
+   fields:[{name:"kind",type:'Literal["boolean"]',n:false,desc:"Discriminant."},{name:"boolean",type:"bool",n:false,desc:"The value."}]},
+  {name:"MetaDataCheckboxValue",kind:"dataclass",file:"src/peek_app_utilities/models/peek/booking_metadata.py",desc:"<code>MetaDataValue</code> variant: a checkbox.",
+   fields:[{name:"kind",type:'Literal["checkbox"]',n:false,desc:"Discriminant."},{name:"is_checked",type:"bool",n:false,desc:"Whether the box is checked."}]},
+  {name:"MetaDataCurrencyValue",kind:"dataclass",file:"src/peek_app_utilities/models/peek/booking_metadata.py",desc:"<code>MetaDataValue</code> variant: a currency code.",
+   fields:[{name:"kind",type:'Literal["currency"]',n:false,desc:"Discriminant."},{name:"currency",type:"str",n:false,desc:"ISO currency code."}]},
+  {name:"MetaDataDateValue",kind:"dataclass",file:"src/peek_app_utilities/models/peek/booking_metadata.py",desc:"<code>MetaDataValue</code> variant: a date.",
+   fields:[{name:"kind",type:'Literal["date"]',n:false,desc:"Discriminant."},{name:"date",type:"str",n:false,desc:"ISO date string."}]},
+  {name:"MetaDataDecimalValue",kind:"dataclass",file:"src/peek_app_utilities/models/peek/booking_metadata.py",desc:"<code>MetaDataValue</code> variant: a decimal number.",
+   fields:[{name:"kind",type:'Literal["decimal"]',n:false,desc:"Discriminant."},{name:"decimal",type:"str | None",n:true,desc:"Kept as a string to avoid float-precision loss, or <code>None</code>."}]},
+  {name:"MetaDataDurationValue",kind:"dataclass",file:"src/peek_app_utilities/models/peek/booking_metadata.py",desc:"<code>MetaDataValue</code> variant: a duration.",
+   fields:[{name:"kind",type:'Literal["duration"]',n:false,desc:"Discriminant."},{name:"amount",type:"int",n:false,desc:"Quantity of <code>unit</code>."},{name:"unit",type:"MetaDataDurationUnit | None",n:true,desc:"Time unit, or <code>None</code>."}]},
+  {name:"MetaDataEmailValue",kind:"dataclass",file:"src/peek_app_utilities/models/peek/booking_metadata.py",desc:"<code>MetaDataValue</code> variant: an email address.",
+   fields:[{name:"kind",type:'Literal["email"]',n:false,desc:"Discriminant."},{name:"email",type:"str | None",n:true,desc:"The address, or <code>None</code>."}]},
+  {name:"MetaDataGuestValue",kind:"dataclass",file:"src/peek_app_utilities/models/peek/booking_metadata.py",desc:"<code>MetaDataValue</code> variant: a guest record. The identity fields (<code>name</code>/<code>email</code>/<code>date_of_birth</code>) are PII and come back <code>None</code> unless the access service has <code>full_customer_access</code>.",
+   fields:[{name:"kind",type:'Literal["guest"]',n:false,desc:"Discriminant."},{name:"name",type:"str | None",n:true,desc:"Guest name (PII)."},{name:"email",type:"str | None",n:true,desc:"Guest email (PII)."},{name:"date_of_birth",type:"str | None",n:true,desc:"ISO date of birth (PII)."},{name:"notes",type:"str | None",n:true,desc:"Free-text notes."},{name:"waiver_signed",type:"bool | None",n:true,desc:"Whether the guest signed the waiver."}]},
+  {name:"MetaDataHtmlValue",kind:"dataclass",file:"src/peek_app_utilities/models/peek/booking_metadata.py",desc:"<code>MetaDataValue</code> variant: an HTML fragment (raw; <code>MetaData.display_value</code> carries the escaped rendering).",
+   fields:[{name:"kind",type:'Literal["html"]',n:false,desc:"Discriminant."},{name:"html",type:"str",n:false,desc:"Raw HTML."}]},
+  {name:"MetaDataImageUrlValue",kind:"dataclass",file:"src/peek_app_utilities/models/peek/booking_metadata.py",desc:"<code>MetaDataValue</code> variant: an image URL.",
+   fields:[{name:"kind",type:'Literal["imageUrl"]',n:false,desc:"Discriminant."},{name:"image_url",type:"str",n:false,desc:"The URL."}]},
+  {name:"MetaDataIntegerValue",kind:"dataclass",file:"src/peek_app_utilities/models/peek/booking_metadata.py",desc:"<code>MetaDataValue</code> variant: an integer.",
+   fields:[{name:"kind",type:'Literal["integer"]',n:false,desc:"Discriminant."},{name:"integer",type:"int",n:false,desc:"The value."}]},
+  {name:"MetaDataLocationValue",kind:"dataclass",file:"src/peek_app_utilities/models/peek/booking_metadata.py",desc:"<code>MetaDataValue</code> variant: a postal location. Every component nullable.",
+   fields:[{name:"kind",type:'Literal["location"]',n:false,desc:"Discriminant."},{name:"country",type:"str | None",n:true,desc:"Country."},{name:"county",type:"str | None",n:true,desc:"County."},{name:"locality",type:"str | None",n:true,desc:"Locality / city."},{name:"postal_code",type:"str | None",n:true,desc:"Postal code."},{name:"region",type:"str | None",n:true,desc:"Region / state."},{name:"street_address",type:"str | None",n:true,desc:"Street address."}]},
+  {name:"MetaDataLongTextValue",kind:"dataclass",file:"src/peek_app_utilities/models/peek/booking_metadata.py",desc:"<code>MetaDataValue</code> variant: long free text.",
+   fields:[{name:"kind",type:'Literal["longText"]',n:false,desc:"Discriminant."},{name:"long_text",type:"str",n:false,desc:"The text."}]},
+  {name:"MetaDataMetaValue",kind:"dataclass",file:"src/peek_app_utilities/models/peek/booking_metadata.py",desc:"<code>MetaDataValue</code> variant: an opaque JSON payload.",
+   fields:[{name:"kind",type:'Literal["meta"]',n:false,desc:"Discriminant."},{name:"meta",type:"Any",n:false,desc:"Arbitrary JSON value as delivered."}]},
+  {name:"MetaDataPercentValue",kind:"dataclass",file:"src/peek_app_utilities/models/peek/booking_metadata.py",desc:"<code>MetaDataValue</code> variant: a percentage.",
+   fields:[{name:"kind",type:'Literal["percent"]',n:false,desc:"Discriminant."},{name:"percent",type:"str | None",n:true,desc:"Kept as a string to avoid float-precision loss, or <code>None</code>."}]},
+  {name:"MetaDataPhoneValue",kind:"dataclass",file:"src/peek_app_utilities/models/peek/booking_metadata.py",desc:"<code>MetaDataValue</code> variant: a phone number.",
+   fields:[{name:"kind",type:'Literal["phone"]',n:false,desc:"Discriminant."},{name:"phone",type:"str",n:false,desc:"The number."}]},
+  {name:"MetaDataShortTextValue",kind:"dataclass",file:"src/peek_app_utilities/models/peek/booking_metadata.py",desc:"<code>MetaDataValue</code> variant: short free text (what the <code>set_meta_data_…</code> shortText writers store).",
+   fields:[{name:"kind",type:'Literal["shortText"]',n:false,desc:"Discriminant."},{name:"short_text",type:"str",n:false,desc:"The text."}]},
+  {name:"MetaDataTimeValue",kind:"dataclass",file:"src/peek_app_utilities/models/peek/booking_metadata.py",desc:"<code>MetaDataValue</code> variant: a time of day.",
+   fields:[{name:"kind",type:'Literal["time"]',n:false,desc:"Discriminant."},{name:"time",type:"str",n:false,desc:"ISO time string."}]},
+  {name:"MetaDataUrlValue",kind:"dataclass",file:"src/peek_app_utilities/models/peek/booking_metadata.py",desc:"<code>MetaDataValue</code> variant: a URL.",
+   fields:[{name:"kind",type:'Literal["url"]',n:false,desc:"Discriminant."},{name:"url",type:"str | None",n:true,desc:"The URL, or <code>None</code>."}]},
+  {name:"MetaDataVolumeValue",kind:"dataclass",file:"src/peek_app_utilities/models/peek/booking_metadata.py",desc:"<code>MetaDataValue</code> variant: a volume.",
+   fields:[{name:"kind",type:'Literal["volume"]',n:false,desc:"Discriminant."},{name:"amount",type:"str",n:false,desc:"Decimal string."},{name:"unit",type:"MetaDataVolumeUnit | None",n:true,desc:"Volume unit, or <code>None</code>."}]},
+  {name:"MetaDataWeightValue",kind:"dataclass",file:"src/peek_app_utilities/models/peek/booking_metadata.py",desc:"<code>MetaDataValue</code> variant: a weight.",
+   fields:[{name:"kind",type:'Literal["weight"]',n:false,desc:"Discriminant."},{name:"amount",type:"str",n:false,desc:"Decimal string."},{name:"unit",type:"MetaDataWeightUnit | None",n:true,desc:"Mass unit, or <code>None</code>."}]},
+  {name:"MetaDataBarcodeType",kind:"type",file:"src/peek_app_utilities/models/peek/booking_metadata.py",
+   desc:"Barcode symbology on a <code>MetaDataBarcodeValue</code>.",def:'Literal["BARCODE_CODE128", "BARCODE_CODE39", "DATA_MATRIX", "EAN_13", "ITF", "QR_CODE", "TEXT", "UPC"]'},
+  {name:"MetaDataDurationUnit",kind:"type",file:"src/peek_app_utilities/models/peek/booking_metadata.py",
+   desc:"Time unit on a <code>MetaDataDurationValue</code>.",def:'Literal["SECONDS", "MINUTES", "HOURS", "DAYS", "WEEKS", "MONTHS", "YEARS"]'},
+  {name:"MetaDataVolumeUnit",kind:"type",file:"src/peek_app_utilities/models/peek/booking_metadata.py",
+   desc:"Volume unit on a <code>MetaDataVolumeValue</code>.",def:'Literal["GALLON"]'},
+  {name:"MetaDataWeightUnit",kind:"type",file:"src/peek_app_utilities/models/peek/booking_metadata.py",
+   desc:"Mass unit on a <code>MetaDataWeightValue</code>.",def:'Literal["KILOGRAM", "POUND", "STONE"]'},
+  {name:"SetMetaDataGuestInput",kind:"input",file:"src/peek_app_utilities/models/peek/booking_metadata.py",desc:"A guest entry for <code>BookingService.set_meta_data_guest</code>.",
+   fields:[
+    {name:"name",type:"str",n:false,desc:"Guest name (required)."},
+    {name:"email",type:"str",n:false,desc:"Guest email (required)."},
+    {name:"date_of_birth",type:"str | None",n:"opt",desc:"Date of birth as an ISO date (e.g. <code>2010-06-21</code>)."},
+    {name:"waiver_signed",type:"bool | None",n:"opt",desc:"Whether the guest signed the waiver."},
+    {name:"notes",type:"str | None",n:"opt",desc:"Free-text notes."}
+   ]},
+  {name:"SetMetaDataAttachmentInput",kind:"input",file:"src/peek_app_utilities/models/peek/booking_metadata.py",desc:"An attachment entry for <code>BookingService.set_meta_data_attachment</code>.",
+   fields:[
+    {name:"name",type:"str",n:false,desc:"Display name for the attachment (required)."},
+    {name:"attachment_url",type:"str",n:false,desc:"URL of the attachment (required)."}
+   ]},
+  {name:"SetMetaDataResult",kind:"dataclass",file:"src/peek_app_utilities/models/peek/booking_metadata.py",desc:"The result of a <code>set_meta_data_…</code> write (maps Peek's success/error result union).",
+   fields:[
+    {name:"success",type:"bool",n:false,desc:"Whether Peek reported the upsert succeeded."},
+    {name:"booking_id",type:"str",n:false,desc:"Booking id echoed back (falls back to the requested id)."},
+    {name:"message",type:"str",n:false,desc:"Peek's success/error message (<code>\"\"</code> when none)."}
+   ]},
+  {name:"Booking",kind:"dataclass",file:"src/peek_app_utilities/models/peek/booking.py",desc:"A clean booking record. Price-breakdown fields are only populated with <code>include_price_breakdown</code>; <code>guests</code> only with <code>include_guests</code>. Customer PII fields (<code>customer_name</code>/<code>customer_email</code>/<code>customer_phone</code>, <code>portal_url</code>, custom answers) are <code>None</code>/empty when <code>full_customer_access</code> is off.",
+   fields:[
+    {name:"booking_id",type:"str",n:false,desc:"Stable booking id."},
+    {name:"display_id",type:"str",n:false,desc:"Human-facing display id (e.g. <code>B-123456</code>)."},
+    {name:"source",type:"str",n:false,desc:"Normalized source (e.g. <code>website</code>); <code>unknown</code> if unmapped."},
+    {name:"source_app",type:"str",n:false,desc:"Raw source app (e.g. <code>WIDGET</code>); <code>unknown</code> if absent."},
+    {name:"source_description",type:"str",n:false,desc:"Human-readable source description; <code>unknown</code> if unmapped."},
+    {name:"source_details",type:"str | None",n:true,desc:"Raw source actor name; <code>None</code> when none."},
+    {name:"customer_name",type:"str | None",n:true,desc:"Primary guest name (PII)."},
+    {name:"customer_email",type:"str | None",n:true,desc:"Primary guest email (PII)."},
+    {name:"customer_phone",type:"str | None",n:true,desc:"Primary guest phone (PII)."},
+    {name:"product_id",type:"str",n:false,desc:"Activity id; <code>unknown</code> if absent."},
+    {name:"product_name",type:"str",n:false,desc:"Activity name; <code>unknown</code> if absent."},
+    {name:"is_rental_product",type:"bool",n:false,desc:"Whether the booked product is a rental."},
+    {name:"timeslot_id",type:"str | None",n:true,desc:"Timeslot legacy id, or <code>None</code>."},
+    {name:"total_tickets",type:"int",n:false,desc:"Total tickets across lines."},
+    {name:"ticket_description",type:"str",n:false,desc:"Human ticket summary (e.g. <code>2x Adult, 1x Child</code>)."},
+    {name:"tickets",type:"list[Ticket]",n:false,desc:"Ticket lines."},
+    {name:"is_canceled",type:"bool",n:false,desc:"Canceled."},
+    {name:"is_no_show",type:"bool",n:false,desc:"Marked no-show."},
+    {name:"is_checked_in",type:"bool",n:false,desc:"Any guest checked in."},
+    {name:"is_returned",type:"bool",n:false,desc:"Rental returned."},
+    {name:"purchased_at",type:"str | None",n:true,desc:"Purchase time (local ISO)."},
+    {name:"purchased_at_utc",type:"str | None",n:true,desc:"Purchase time (UTC ISO)."},
+    {name:"starts_at",type:"str | None",n:true,desc:"Activity start (local ISO)."},
+    {name:"starts_at_utc",type:"str | None",n:true,desc:"Activity start (UTC ISO)."},
+    {name:"ends_at",type:"str | None",n:true,desc:"Activity end (local ISO)."},
+    {name:"ends_at_utc",type:"str | None",n:true,desc:"Activity end (UTC ISO)."},
+    {name:"duration_min",type:"int",n:false,desc:"Duration minutes (0 when unknown)."},
+    {name:"availability_time_id",type:"str | None",n:true,desc:"Availability time id, or <code>None</code>."},
+    {name:"portal_url",type:"str | None",n:true,desc:"Customer booking-portal URL, or <code>None</code> (PII)."},
+    {name:"notes",type:"str",n:false,desc:"Operator notes (<code>\"\"</code> when none)."},
+    {name:"custom_status",type:"str | None",n:true,desc:"Operator-facing custom status (set via <code>update_custom_status</code>), or <code>None</code> when none."},
+    {name:"value_display",type:"str",n:false,desc:"Total value formatted; <code>\"\"</code> if absent."},
+    {name:"value_amount",type:"str",n:false,desc:"Total value numeric string; <code>\"\"</code> if absent."},
+    {name:"outstanding_balance_amount",type:"str",n:false,desc:"Outstanding balance numeric string; <code>\"\"</code> if absent."},
+    {name:"outstanding_balance_display",type:"str",n:false,desc:"Outstanding balance formatted; <code>\"\"</code> if absent."},
+    {name:"promo_codes",type:"list[str]",n:false,desc:"Applied promo redemption codes."},
+    {name:"tips",type:"list[Price]",n:false,desc:"Tips left."},
+    {name:"convenience_fee",type:"Price | None",n:true,desc:"Only with <code>include_price_breakdown</code>."},
+    {name:"deposit",type:"Price | None",n:true,desc:"Only with <code>include_price_breakdown</code>."},
+    {name:"discount",type:"Price | None",n:true,desc:"Only with <code>include_price_breakdown</code>."},
+    {name:"discounted_price",type:"Price | None",n:true,desc:"Only with <code>include_price_breakdown</code>."},
+    {name:"fees",type:"Price | None",n:true,desc:"Only with <code>include_price_breakdown</code>."},
+    {name:"flat_partner_fee",type:"Price | None",n:true,desc:"Only with <code>include_price_breakdown</code>."},
+    {name:"price",type:"Price | None",n:true,desc:"Base price; only with <code>include_price_breakdown</code>."},
+    {name:"retail_price",type:"Price | None",n:true,desc:"Only with <code>include_price_breakdown</code>."},
+    {name:"taxes",type:"Price | None",n:true,desc:"Only with <code>include_price_breakdown</code>."},
+    {name:"tips_breakdown",type:"Price | None",n:true,desc:"Tips total; only with <code>include_price_breakdown</code>."},
+    {name:"resources",type:"list[Resource]",n:false,desc:"Pool-level resource usage."},
+    {name:"resource_pool_assignments",type:"list[ResourcePoolAssignment]",n:false,desc:"Concrete assigned resources."},
+    {name:"reseller_id",type:"str | None",n:true,desc:"Reseller channel id, or <code>None</code> for direct."},
+    {name:"reseller_name",type:"str | None",n:true,desc:"Reseller display name (channel, plus <code> - &lt;agent&gt;</code> when set), or <code>None</code> for direct."},
+    {name:"order_id",type:"str",n:false,desc:"Order id; <code>\"\"</code> if absent."},
+    {name:"peek_pro_booking_deep_link",type:"str",n:false,desc:"Deep link into Peek Pro; <code>\"\"</code> when ids are absent."},
+    {name:"custom_question_answers",type:"list[CustomQuestionAnswer]",n:false,desc:"Booking-level custom answers (PII when populated)."},
+    {name:"custom_guest_question_answers",type:"list[CustomQuestionAnswer]",n:false,desc:"Per-guest/ticket custom answers (PII when populated)."},
+    {name:"guests",type:"list[Guest] | None",n:true,desc:"Only with <code>include_guests</code>; otherwise <code>None</code>."}
+   ]},
+  {name:"Ticket",kind:"dataclass",file:"src/peek_app_utilities/models/peek/booking.py",desc:"A ticket line on a booking.",
+   fields:[
+    {name:"name",type:"str",n:false,desc:"Ticket name (falls back to <code>Unknown</code>)."},
+    {name:"quantity",type:"int",n:false,desc:"How many of this ticket."},
+    {name:"ticket_id",type:"str",n:false,desc:"Resource option id (falls back to <code>unknown</code>)."},
+    {name:"list_price",type:"Price | None",n:true,desc:"Per-unit list price; only with <code>include_price_breakdown</code>."},
+    {name:"total_value",type:"Price | None",n:true,desc:"Total line value; only with <code>include_price_breakdown</code>."}
+   ]},
+  {name:"Price",kind:"dataclass",file:"src/peek_app_utilities/models/peek/booking.py",desc:"A formatted money value on a booking.",
+   fields:[
+    {name:"display",type:"str",n:false,desc:"Human-formatted amount (e.g. <code>$25.00</code>)."},
+    {name:"amount",type:"str",n:false,desc:"Numeric amount as a string."}
+   ]},
+  {name:"Resource",kind:"dataclass",file:"src/peek_app_utilities/models/peek/booking.py",desc:"Pool-level resource usage on a booking.",
+   fields:[
+    {name:"quantity",type:"int",n:false,desc:"Units used."},
+    {name:"name",type:"str",n:false,desc:"Pool name."},
+    {name:"short_name",type:"str",n:false,desc:"Pool short name."}
+   ]},
+  {name:"ResourcePoolAssignment",kind:"dataclass",file:"src/peek_app_utilities/models/peek/booking.py",desc:"A concrete resource assigned to a booking.",
+   fields:[
+    {name:"id",type:"str",n:false,desc:"Assigned resource id."},
+    {name:"name",type:"str",n:false,desc:"Assigned resource name."}
+   ]},
+  {name:"CustomQuestionAnswer",kind:"dataclass",file:"src/peek_app_utilities/models/peek/booking.py",desc:"A customer's answer to a custom question (PII when populated).",
+   fields:[
+    {name:"question",type:"str",n:false,desc:"Question text shown to the customer."},
+    {name:"answer",type:"str",n:false,desc:"Customer's answer."},
+    {name:"latitude",type:"str | None",n:true,desc:"Captured latitude (location questions only)."},
+    {name:"longitude",type:"str | None",n:true,desc:"Captured longitude (location questions only)."}
+   ]},
+  {name:"GuestMetadata",kind:"dataclass",file:"src/peek_app_utilities/models/peek/booking.py",desc:"A custom field response for a guest.",
+   fields:[
+    {name:"id",type:"str",n:false,desc:"Field response id."},
+    {name:"name",type:"str",n:false,desc:"Field name."},
+    {name:"value",type:"str",n:false,desc:"Captured value (empty string when none)."}
+   ]},
+  {name:"Guest",kind:"dataclass",file:"src/peek_app_utilities/models/peek/booking.py",desc:"A booking guest. Populated only with <code>include_guests</code> (or via <code>get_guests</code>); identity fields (name/country/DOB/phone/email/postal_code) are <code>None</code> when <code>full_customer_access</code> is off (PII).",
+   fields:[
+    {name:"id",type:"str",n:false,desc:"Guest id."},
+    {name:"name",type:"str | None",n:true,desc:"Guest name (PII)."},
+    {name:"country",type:"str | None",n:true,desc:"Country (PII)."},
+    {name:"date_of_birth",type:"datetime | None",n:true,desc:"Date of birth (PII)."},
+    {name:"phone",type:"str | None",n:true,desc:"Phone (PII)."},
+    {name:"email",type:"str | None",n:true,desc:"Email (PII)."},
+    {name:"is_gdpr",type:"bool",n:false,desc:"Subject to GDPR handling."},
+    {name:"is_participant",type:"bool",n:false,desc:"Actual participant vs booker only."},
+    {name:"is_primary",type:"bool",n:false,desc:"Booking's primary guest."},
+    {name:"optin_sms",type:"bool",n:false,desc:"Opted in to SMS."},
+    {name:"optin_marketing",type:"bool",n:false,desc:"Opted in to marketing."},
+    {name:"postal_code",type:"str | None",n:true,desc:"Postal code (PII)."},
+    {name:"metadata",type:"list[GuestMetadata]",n:false,desc:"Custom field responses for this guest."}
+   ]},
+  {name:"BookingReadOptions",kind:"input",file:"src/peek_app_utilities/models/peek/booking.py",desc:"Read options for booking fetches.",
+   fields:[
+    {name:"include_guests",type:"bool | None",n:"opt",desc:"Include guests (default <code>False</code>)."},
+    {name:"include_price_breakdown",type:"bool | None",n:"opt",desc:"Include price breakdown fields (default <code>False</code>)."}
+   ]},
+  {name:"BookingTimeRangeSearch",kind:"input",file:"src/peek_app_utilities/models/peek/booking.py",extends:"BookingReadOptions",desc:"Input to <code>search_by_time_range</code>.",
+   fields:[
+    {name:"start",type:"str",n:false,desc:"Range start (ISO datetime)."},
+    {name:"end",type:"str",n:false,desc:"Range end (ISO datetime)."},
+    {name:"search_by",type:"BookingSearchBy | None",n:"opt",desc:"Purchase vs activity date (default <code>purchaseDate</code>)."},
+    {name:"product_id",type:"str | None",n:"opt",desc:"Restrict to a product id."},
+    {name:"email",type:"str | None",n:"opt",desc:"Filter by primary guest email."},
+    {name:"search_string",type:"str | None",n:"opt",desc:"Free-text search."}
+   ]},
+  {name:"CreateBookingTicket",kind:"input",file:"src/peek_app_utilities/models/peek/booking.py",desc:"A ticket to book in <code>create</code>.",
+   fields:[
+    {name:"resource_option_id",type:"str",n:false,desc:"Resource option to book — this is the <code>ProductTicket.id</code> from the activity's <code>tickets</code>."},
+    {name:"quantity",type:"int",n:false,desc:"Seats (expanded per unit)."}
+   ]},
+  {name:"CreateBookingGuest",kind:"input",file:"src/peek_app_utilities/models/peek/booking.py",desc:"The primary guest in <code>create</code>.",
+   fields:[
+    {name:"name",type:"str",n:false,desc:"Guest name (required)."},
+    {name:"email",type:"str | None",n:"opt",desc:"Email."},
+    {name:"phone",type:"str | None",n:"opt",desc:"Phone."},
+    {name:"postal_code",type:"str | None",n:"opt",desc:"Postal code."},
+    {name:"country",type:"str | None",n:"opt",desc:"Country."},
+    {name:"optin_marketing",type:"bool | None",n:"opt",desc:"Marketing opt-in."},
+    {name:"optin_sms",type:"bool | None",n:"opt",desc:"SMS opt-in."}
+   ]},
+  {name:"CustomQuestionAnswerInput",kind:"input",file:"src/peek_app_utilities/models/peek/booking.py",desc:"A custom-question answer supplied to <code>create</code>.",
+   fields:[
+    {name:"question_id_or_text",type:"str",n:false,desc:"Question id (<code>cq_…</code>) or its text (matched leniently; must match exactly one)."},
+    {name:"value",type:"str",n:false,desc:"Answer, interpreted by question type (checkbox yes/no/true/false; text verbatim; select-one/location = option id <code>cqao_…</code> or label). Per-guest questions are not yet supported."}
+   ]},
+  {name:"CreateBookingInput",kind:"input",file:"src/peek_app_utilities/models/peek/booking.py",desc:"Input to <code>BookingService.create</code>.",
+   fields:[
+    {name:"activity_id",type:"str",n:false,desc:"Activity id."},
+    {name:"availability_time_id",type:"str",n:false,desc:"Availability time id (an <code>AvailabilityTime.id</code>)."},
+    {name:"tickets",type:"list[CreateBookingTicket]",n:false,desc:"Tickets to book."},
+    {name:"guest",type:"CreateBookingGuest",n:false,desc:"Primary guest."},
+    {name:"operator_notes",type:"str | None",n:"opt",desc:"Operator notes."},
+    {name:"list_price",type:"str | None",n:"opt",desc:"Total booking list price (positive number string; commas allowed — <code>100</code>, <code>1,000</code>, <code>10.00</code>). Split evenly across tickets (last ticket gets the remainder cent) and sent per ticket in the activity's currency (fallback <code>USD</code>). Omit to use Peek's configured pricing."},
+    {name:"custom_question_answers",type:"list[CustomQuestionAnswerInput] | None",n:"opt",desc:"Answers, validated/resolved before creation."},
+    {name:"require_required_questions",type:"bool | None",n:"opt",desc:"Fail if a required question is unanswered (default <code>False</code>)."},
+    {name:"accept_all_custom_question_ids",type:"bool | None",n:"opt",desc:"Accept a <code>cq_…</code> id not in the activity's question list as a plain text answer instead of failing; by-name answers still must match (default <code>False</code>)."},
+    {name:"skip_customer_email",type:"bool | None",n:"opt",desc:"Suppress the confirmation email (default <code>False</code>)."},
+    {name:"parent_order_id",type:"str | None",n:"opt",desc:"Clone the quote from an existing order (must be a valid <code>o_…</code>/<code>O-…</code> id)."},
+    {name:"mark_as_paid",type:"bool | None",n:"opt",desc:"Mark paid after creation (requires <code>idempotency_key</code>)."},
+    {name:"mark_as_paid_amount",type:"str | None",n:"opt",desc:"Partial payment amount; defaults to the full balance."},
+    {name:"idempotency_key",type:"str | None",n:"opt",desc:"Idempotency key for the mark-paid charge."}
+   ]},
+  {name:"CreatedBooking",kind:"dataclass",file:"src/peek_app_utilities/models/peek/booking.py",desc:"Result of <code>create</code>.",
+   fields:[
+    {name:"order_id",type:"str",n:false,desc:"Order id."},
+    {name:"booking_id",type:"str",n:false,desc:"New booking id."},
+    {name:"display_id",type:"str",n:false,desc:"Human-facing display id."},
+    {name:"balance_amount",type:"str",n:false,desc:"Remaining balance numeric string."},
+    {name:"balance_currency",type:"str",n:false,desc:"3-letter ISO currency code."},
+    {name:"balance_formatted",type:"str",n:false,desc:"Balance formatted (e.g. <code>$75.00</code>)."},
+    {name:"transaction_id",type:"str | None",n:true,desc:"Charge transaction id; set only when marked paid, else <code>None</code>."}
+   ]},
+  {name:"Payment",kind:"dataclass",file:"src/peek_app_utilities/models/peek/booking_payment.py",desc:"A payment applied to an order.",
+   fields:[
+    {name:"id",type:"str",n:false,desc:"Payment id (<code>pmt_…</code>)."},
+    {name:"paid_at",type:"str",n:false,desc:"Date applied (<code>YYYY-MM-DD</code>)."},
+    {name:"current_amount",type:"PaymentAmount",n:false,desc:"Current amount net of refunds."},
+    {name:"refundable_amount",type:"PaymentAmount",n:false,desc:"Still-refundable amount."}
+   ]},
+  {name:"PaymentAmount",kind:"dataclass",file:"src/peek_app_utilities/models/peek/booking_payment.py",desc:"A money amount on a <code>Payment</code>. Import from <code>peek_app_utilities.models.peek.booking_payment</code>.",
+   fields:[
+    {name:"amount",type:"str",n:false,desc:"Numeric amount as a string."},
+    {name:"currency",type:"str",n:false,desc:"ISO currency code."}
+   ]},
+  {name:"PaymentSource",kind:"dataclass",file:"src/peek_app_utilities/models/peek/booking_payment.py",desc:"A payment source with its grouped payments.",
+   fields:[
+    {name:"description",type:"str",n:false,desc:"Source description (e.g. card summary)."},
+    {name:"id",type:"str",n:false,desc:"Source id (<code>ps_…</code> or synthetic like <code>cash/cash</code>)."},
+    {name:"type",type:"str",n:false,desc:"Source type (card/cash/custom)."},
+    {name:"payments",type:"list[Payment] | None",n:true,desc:"Payments against this source, or <code>None</code> when none exist."}
+   ]},
+  {name:"BookingPaymentsOnFile",kind:"dataclass",file:"src/peek_app_utilities/models/peek/booking_payment.py",desc:"Payments on file for a booking (PII-gated result).",
+   fields:[
+    {name:"booking_id",type:"str",n:false,desc:"The booking."},
+    {name:"order_id",type:"str",n:false,desc:"The order."},
+    {name:"payments_on_file",type:"list[PaymentSource]",n:false,desc:"Payment sources with grouped payments."}
+   ]},
+  {name:"MakePaymentInput",kind:"input",file:"src/peek_app_utilities/models/peek/booking_payment.py",desc:"Input to <code>make_payment</code>.",
+   fields:[
+    {name:"booking_id",type:"str",n:false,desc:"Booking id (normalized internally)."},
+    {name:"payment_source_id",type:"str",n:false,desc:"<code>ps_…</code> or <code>cash/cash</code>/<code>custom/other</code>/<code>custom/voucher</code>."},
+    {name:"amount",type:"str",n:false,desc:"Amount numeric string."},
+    {name:"currency",type:"str",n:false,desc:"3-letter uppercase ISO currency."},
+    {name:"idempotency_key",type:"str",n:false,desc:"Idempotency key."},
+    {name:"customer_message",type:"str | None",n:"opt",desc:"Appended to the default customer message."}
+   ]},
+  {name:"MakePaymentResult",kind:"dataclass",file:"src/peek_app_utilities/models/peek/booking_payment.py",desc:"Result of <code>make_payment</code>.",
+   fields:[
+    {name:"transaction_id",type:"str",n:false,desc:"Transaction id."},
+    {name:"booking_id",type:"str",n:false,desc:"Booking charged."},
+    {name:"order_id",type:"str",n:false,desc:"Order charged."},
+    {name:"amount",type:"str",n:false,desc:"Amount charged."},
+    {name:"currency",type:"str",n:false,desc:"Currency of the charge."},
+    {name:"payment_source_id",type:"str",n:false,desc:"Source charged."}
+   ]},
+  {name:"RefundInput",kind:"input",file:"src/peek_app_utilities/models/peek/booking_payment.py",desc:"Input to <code>refund</code>.",
+   fields:[
+    {name:"booking_id",type:"str",n:false,desc:"Booking id (normalized internally)."},
+    {name:"payment_id",type:"str",n:false,desc:"Payment to refund (<code>pmt_…</code>)."},
+    {name:"amount",type:"str",n:false,desc:"Amount numeric string."},
+    {name:"currency",type:"str",n:false,desc:"3-letter uppercase ISO currency."},
+    {name:"idempotency_key",type:"str",n:false,desc:"Idempotency key."}
+   ]},
+  {name:"RefundResult",kind:"dataclass",file:"src/peek_app_utilities/models/peek/booking_payment.py",desc:"Result of <code>refund</code>.",
+   fields:[
+    {name:"transaction_id",type:"str",n:false,desc:"Transaction id."},
+    {name:"booking_id",type:"str",n:false,desc:"Booking refunded."},
+    {name:"order_id",type:"str",n:false,desc:"Order refunded."},
+    {name:"amount",type:"str",n:false,desc:"Amount refunded."},
+    {name:"currency",type:"str",n:false,desc:"Currency of the refund."},
+    {name:"payment_id",type:"str",n:false,desc:"Payment refunded (<code>pmt_…</code>)."}
+   ]},
+  {name:"InvoiceLinkResult",kind:"dataclass",file:"src/peek_app_utilities/models/peek/booking_payment.py",desc:"Result of <code>create_invoice_link</code>.",
+   fields:[
+    {name:"booking_id",type:"str",n:false,desc:"Booking the invoice is for."},
+    {name:"order_id",type:"str",n:false,desc:"Order the invoice is for."},
+    {name:"invoice_link",type:"str",n:false,desc:"Customer-facing payable URL."}
+   ]},
+  {name:"BookingAddonMoney",kind:"dataclass",file:"src/peek_app_utilities/models/peek/booking_addon.py",desc:"A money value on a booking add-on.",
+   fields:[
+    {name:"amount",type:"str",n:false,desc:"Numeric amount string."},
+    {name:"currency",type:"str",n:false,desc:"ISO currency code."},
+    {name:"formatted",type:"str",n:false,desc:"Human-formatted amount."}
+   ]},
+  {name:"BookingAddonOption",kind:"dataclass",file:"src/peek_app_utilities/models/peek/booking_addon.py",desc:"A live option on a booking add-on.",
+   fields:[
+    {name:"addon_option_id",type:"str",n:false,desc:"Item option id."},
+    {name:"addon_option_name",type:"str",n:false,desc:"Item option name."},
+    {name:"quantity",type:"int",n:false,desc:"Live (non-canceled) units."}
+   ]},
+  {name:"BookingAddon",kind:"dataclass",file:"src/peek_app_utilities/models/peek/booking_addon.py",desc:"An add-on on a booking, grouped by add-on item.",
+   fields:[
+    {name:"addon_id",type:"str",n:false,desc:"Add-on item id."},
+    {name:"addon_name",type:"str",n:false,desc:"Add-on item name."},
+    {name:"total",type:"BookingAddonMoney | None",n:true,desc:"Line-item total, when present."},
+    {name:"addon_options",type:"list[BookingAddonOption]",n:false,desc:"Live options combined by option id."}
+   ]},
+  {name:"BookingAddons",kind:"dataclass",file:"src/peek_app_utilities/models/peek/booking_addon.py",desc:"All add-ons on a booking.",
+   fields:[
+    {name:"booking_id",type:"str",n:false,desc:"Booking id."},
+    {name:"display_id",type:"str",n:false,desc:"Human-facing display id."},
+    {name:"order_id",type:"str",n:false,desc:"Order id."},
+    {name:"addons",type:"list[BookingAddon]",n:false,desc:"Add-ons with ≥1 live option; fully-canceled omitted."}
+   ]},
+  {name:"BookingAddonsMutationResult",kind:"dataclass",file:"src/peek_app_utilities/models/peek/booking_addon.py",desc:"Result of <code>add_addon</code>/<code>remove_addon</code>.",
+   fields:[{name:"updated_booking_addons",type:"BookingAddons",n:false,desc:"Post-change add-on state."}]},
+  {name:"Review",kind:"dataclass",file:"src/peek_app_utilities/models/peek/review.py",desc:"A customer review. Reviewer <code>customer_name</code>/<code>customer_email</code> are <code>None</code> when <code>full_customer_access</code> is off (PII).",
+   fields:[
+    {name:"id",type:"str",n:false,desc:"Review id (e.g. <code>rvw_359erv</code>)."},
+    {name:"product_id",type:"str",n:false,desc:"Activity id."},
+    {name:"product_name",type:"str",n:false,desc:"Activity name."},
+    {name:"guides",type:"list[Guide]",n:false,desc:"Credited guides (may be empty)."},
+    {name:"customer_name",type:"str | None",n:true,desc:"Customer name (<code>None</code> when PII off)."},
+    {name:"customer_email",type:"str | None",n:true,desc:"Customer email (<code>None</code> when PII off)."},
+    {name:"activity_date",type:"str",n:false,desc:"Activity date (<code>YYYY-MM-DD</code>)."},
+    {name:"review_date",type:"str",n:false,desc:"Review date (<code>YYYY-MM-DD</code>)."},
+    {name:"rating",type:"float",n:false,desc:"Star rating 1–5."},
+    {name:"comment",type:"str | None",n:true,desc:"Free-text review."}
+   ]},
+  {name:"Guide",kind:"dataclass",file:"src/peek_app_utilities/models/peek/review.py",desc:"A guide credited on a review.",
+   fields:[
+    {name:"id",type:"str",n:false,desc:"Guide id (e.g. <code>u_y6e4r</code>)."},
+    {name:"name",type:"str",n:false,desc:"Guide display name."}
+   ]},
+  {name:"ProductReviewSummary",kind:"dataclass",file:"src/peek_app_utilities/models/peek/review.py",desc:"Aggregate review statistics for one activity, returned by <code>ReviewService.get_all_review_summaries</code>. No per-review detail or PII.",
+   fields:[
+    {name:"product_id",type:"str",n:false,desc:"Activity id."},
+    {name:"product_name",type:"str",n:false,desc:"Activity name."},
+    {name:"avg_rating",type:"float | None",n:true,desc:"Average star rating (decimal); <code>None</code> when there are no ratings."},
+    {name:"count_total",type:"int",n:false,desc:"Total number of reviews."},
+    {name:"count_one_star",type:"int",n:false,desc:"Number of 1-star reviews."},
+    {name:"count_two_star",type:"int",n:false,desc:"Number of 2-star reviews."},
+    {name:"count_three_star",type:"int",n:false,desc:"Number of 3-star reviews."},
+    {name:"count_four_star",type:"int",n:false,desc:"Number of 4-star reviews."},
+    {name:"count_five_star",type:"int",n:false,desc:"Number of 5-star reviews."}
+   ]},
+  {name:"AccessOptions",kind:"input",file:"src/peek_app_utilities/access_options.py",desc:"Cross-cutting access options passed once at access-service construction (and accepted directly by <code>parse_waiver_webhook</code>). Governs PII exposure and payment/modification gating. Threaded into <code>BookingService</code> and <code>ReviewService</code>.",
+   fields:[{name:"full_customer_access",type:"bool | None",n:"opt",desc:"Expose customer PII and enable payment/modification ops (default <code>False</code>)."}]},
+  {name:"AppUtilitiesError",kind:"error class",file:"src/peek_app_utilities/errors.py",
+   desc:"Base class for every error this package raises on its own, so <code>except AppUtilitiesError</code> catches anything package-originated (token-verification failures come from PyJWT and are separate).",
+   def:"class AppUtilitiesError(Exception)"},
+  {name:"PiiAccessDisabledError",kind:"error class",file:"src/peek_app_utilities/errors.py",desc:"Raised by PII-gated <code>BookingService</code> methods (<code>get_payments_on_file</code>, <code>make_payment</code>, <code>refund</code>, <code>create_invoice_link</code>, <code>add_addon</code>, <code>remove_addon</code>) when <code>full_customer_access</code> is off — before any network call.",
+   def:"class PiiAccessDisabledError(AppUtilitiesError):\n    def __init__(self, operation: str)",
+   fields:[{name:"operation",type:"str",n:false,desc:"The gated operation that was refused — the snake_case method name (e.g. <code>\"make_payment\"</code>)."}]}
+ ]
+});
+</script>
+</body>
+</html>
