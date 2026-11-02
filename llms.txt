@@ -1,0 +1,354 @@
+# peek-app-utilities
+
+> Dependency-light **async** Python library wrapping the Peek "backoffice" API
+> (plus the CNG and ACME backoffice APIs). Callers only touch
+> `PeekAccessService`, the per-resource services it hands out, and clean
+> dataclass models — never raw GraphQL. Python ≥ 3.11; runtime dependencies:
+> `httpx`, `PyJWT`. It is the Python port of `@peektravel/app-utilities` and
+> ships the **same version number**, resources, models, and behaviour; names
+> are the TypeScript ones in `snake_case` (`getById` → `get_by_id`,
+> `customerName` → `customer_name`), class names unchanged.
+
+The authoritative, always-in-sync contract is the typed source
+(`peek_app_utilities` ships `py.typed`; every public class and method has a
+docstring) — read it via go-to-definition. This file is a map; the docstrings
+and `README.md` (also shipped) have full detail and examples.
+
+## Entry point
+
+Construct one `PeekAccessService` per install, then call `get_<resource>_service()`
+accessors (each memoized, bound to a shared authenticated transport that mints
+and caches a short-lived JWT). Everything that does I/O is `async def`. Use the
+service as an async context manager (or `await peek.aclose()`) to close the HTTP
+client it owns; a caller-supplied `http_client` is never closed.
+
+```python
+from peek_app_utilities import PeekAccessService, PeekAccessServiceConfig
+
+async with PeekAccessService(PeekAccessServiceConfig(
+    install_id=install_id,   # JWT subject
+    jwt_secret=jwt_secret,   # HMAC secret signing the JWT
+    issuer=issuer,           # app name (JWT issuer)
+    api_url=api_url,         # the install webhook's api_url — the base API URL; each service appends its own slug
+    # optional: gateway_key, token_ttl_seconds, token_refresh_leeway_seconds,
+    # retry_delays_ms, logger, http_client, item_options_page_size,
+    # access_options=AccessOptions(full_customer_access=False)  # default — see "Access options / PII"
+)) as peek:
+    products = await peek.get_product_service().get_all_products()
+```
+
+Targeting an install by URL: pass the install webhook's `api_url` as the config
+`api_url`. It is the install's **base API URL**; each service class appends its own
+backoffice slug (e.g. `peek_backoffice_api-v1`, from a small per-platform endpoint
+lookup) when it calls — so a Peek call goes to `<base>/peek_backoffice_api-v1`
+and a CNG/ACME call to `<base>/<slug>/<path>`. If the URL you pass already
+carries this platform's slug (dashes or underscores interchangeable) it is
+**stripped** back to the base; a URL carrying a *different* platform's slug is
+**rejected** (constructor raises `ValueError`). No app-id segment is inserted
+(`app_id` is unused). `create_access_service_for_install(install, InstallAccessConfig(...))`
+builds the right service for `install.platform` (`peek`/`cng`/`acme`) wired to
+`install.api_url` in one call (raises `ValueError` on unknown/`None` platform).
+`app_id` + `base_url` + `mode` (and the hardcoded gateway default) are
+**deprecated** — they reconstruct the URL with a compiled-in default that can't
+be right for every install; the fallbacks will be removed and a URL will become
+**required**.
+
+## Access options / PII — `full_customer_access`
+
+**The most commonly-misunderstood option in this package. Read this before
+debugging "why is `customer_name` None?" or "why did `make_payment` raise?".**
+
+Every access service takes `access_options: AccessOptions | None`
+(`AccessOptions(full_customer_access: bool | None = None)`). It is passed
+**once at construction**, not per call, and applies to every service that access
+service hands out.
+
+```python
+peek = PeekAccessService(PeekAccessServiceConfig(
+    install_id=install_id, jwt_secret=jwt_secret, issuer=issuer, api_url=api_url,
+    access_options=AccessOptions(full_customer_access=True),  # opt in to PII + payment ops
+))
+```
+
+- **Default is `False` (PII off).** Omitting `access_options`, passing
+  `AccessOptions()`, or passing `None` are all identical to
+  `AccessOptions(full_customer_access=False)`.
+- There is **no per-call override** by design — an install either has customer-
+  data entitlement or it doesn't. Need both modes? Construct two access services.
+- Consumed by `BookingService` and `ReviewService`; `parse_waiver_webhook(body,
+  options=None)` takes the same object directly. `CngAccessService` /
+  `AcmeAccessService` accept the field but have no PII surface (inert).
+
+### With `full_customer_access=False` (default) — two distinct effects
+
+**1. PII is never requested.** Filtering happens in the query selection, so the
+data never leaves the API; the fields simply arrive as `None`/empty in the
+clean models. There is no error and no warning — a missing name looks exactly
+like a customer who didn't provide one.
+
+| Surface | Redacted (→ `None`/empty) | Always present |
+| --- | --- | --- |
+| Booking | primary-guest `customer_name`/`customer_email`/`customer_phone`; per-guest identity (name, country, DOB, email, phone, postal code, `is_gdpr`, custom `metadata` field responses) — guests keep only ids + participation/opt-in flags; booking- and ticket-level `custom_question_answers` / `custom_guest_question_answers`; the customer `portal_url`; the `name`/`email`/`date_of_birth` of a `guest`-kind `MetaData` value | notes, `custom_status`, Peek Pro operator deep link, money/price breakdown, resources, timeslot + structural ids |
+| Review | reviewer `customer_name` / `customer_email` | comment, rating, dates, credited guides |
+| Waiver webhook | participant `guest_name` (→ `None`), signed-document `file_url` (→ `""`) — redacted at parse time; the payload is fixed, so there is no selection to trim | template/booking ids, timestamps, guardian + opt-in flags |
+
+**2. Payment & booking-modification operations are disabled.** These raise
+`PiiAccessDisabledError` (exported; `.operation` names the blocked method in
+snake_case) **before any network call**:
+
+`get_payments_on_file`, `make_payment`, `refund`, `create_invoice_link`,
+`add_addon`, `remove_addon`.
+
+Still available without the flag: `create` (**including `mark_as_paid`**),
+`get_by_id`, `get_guests`, `search_by_time_range`, `search_by_timeslot`,
+`list_addons`, `cancel`, `append_note`, `set_checkin_status`,
+`update_custom_status`, `get_meta_data`, the `set_meta_data_*` setters, and
+every other resource service.
+
+### Choosing a value
+
+Leave it `False` for operations/logistics tooling (manifests, check-in, guide
+assignment, notes, availability) — that surface is fully functional without PII.
+Set it `True` only when the app genuinely needs to contact customers or move
+money, and only when the install is entitled to that data; the API is the final
+authority and may still reject the request.
+
+## Resources (accessor → methods)
+
+All methods are `async`; inputs are keyword-only frozen dataclasses exported
+from the package root.
+
+- `get_product_service()` — `get_all_products()` (flat list of activities +
+  add-ons; add-ons have `type == ADD_ON_PRODUCT_TYPE`), `get_all_activities()`
+  (`ACTIVITY_PRODUCT_TYPE` only), `get_all_rentals()` (`RENTAL_PRODUCT_TYPE`
+  only), `get_all_addons()`. `Product.currency` carries the activity's ISO
+  currency (empty for add-ons). Activities also expose the catalog fields
+  `image_url`, `description`, and `meeting_location`
+  (`ProductMeetingLocation(summary, address, url)`) — all nullable, and
+  `meeting_location` is `None` when Peek reports no location detail (always
+  `None` for add-ons). Each `Product.tickets[]` entry (`ProductTicket`) carries
+  `min_price`/`max_price` (`PricingMoney | None`, `None` for add-ons and when
+  Peek reports no range); every `PricingMoney` read back includes a
+  `display_price` string (e.g. `"$50.00"`).
+  `get_custom_questions(product_id)` returns an activity's operator-configured
+  custom questions as `list[CustomQuestion]` — each with `id`, `order`,
+  `is_required`, `question_text`, `hint_text`, `question_type`
+  (`CHECK_BOX`/`TEXT`/`LOCATION`/`SELECT_ONE`/…), `internal_label`,
+  `per_guest`, `default_value`, and `options: list[CustomQuestionOption]`
+  (`id`, `order`, `value`; empty for free-text/checkbox questions). Question
+  definitions, not answers — no PII. Raises `ValueError` on a blank id;
+  returns `[]` for an unknown activity.
+- `get_account_user_service()` — `get_all()` (active users only),
+  `get_by_id(user_id)` → `AccountUser | None`
+- `get_resource_pool_service()` — `get_all(mode=None)` (`ResourcePoolMode`
+  `"ACTIVITY"`/`"ALL"`, default `"ALL"`)
+- `get_timeslot_service()` — `get_for_day(product_id, date, filter=None)`
+  (`TimeslotFilter` `"all"`/`"withBookings"`/`"withoutBookings"`),
+  `get_by_id(timeslot_id)` → `Timeslot | None`,
+  `set_availability(timeslot_id, status)`, `set_notes(timeslot_id, manifest_notes)`
+  → `UpdateTimeslotResult`, `assign_guide(GuideAssignment(timeslot_ids,
+  guide_ids, action))` → `AssignGuideResult` (guides matched by pool id,
+  account-user id, or name; `action` is `"assign"`/`"unassign"`)
+- `get_reseller_service()` — `get_all_channels(agents_per_channel=None)` (default 10)
+- `get_promo_code_service()` — `get_all()`, `create(CreatePromoCodeInput)` →
+  `CreatedPromoCode`
+- `get_pricing_service()` — `create_engine(CreateEngineInput)`,
+  `update_engine(UpdateEngineInput)`, `delete_engine(engine_id)` (idempotent),
+  `upsert_overrides(UpsertOverridesInput)`, `clear_overrides(ClearOverridesInput)`.
+  Primitives-only: caller builds the `UpsertOverridesInput` (segmentation,
+  override `order`, `spots_taken` bounds are the caller's job); service sends it
+  as-is and returns the resolved `activity_contexts`. The override variant
+  classes (`FixedResourceOptionOverride`, `PercentageResourceOptionOverride`,
+  `SpotsTakenFilter`/`SpotsTakenBounds`, `StartTimeRangeFilter`) are exported
+  from the package root. Guide: `docs/external/pricing-api.md`.
+- `get_daily_note_service()` — `get_today()` → `DailyNote | None`, `update(note)`
+- `get_availability_service()` — `get_availability_times(AvailabilityTimesQuery(
+  activity_id, date, resource_option_quantities))` → `list[AvailabilityTime]`
+  (each with `id`, `time`, `from_`, `end`, `duration`, `status`, `availability`)
+- `get_membership_service()` — `get_all()`, `purchase(MembershipPurchaseInput)`
+  → `PurchasedMembership`
+- `get_booking_service(integrator=None)` — `get_by_id(id, options: BookingReadOptions
+  | None)` → `Booking | None`, `search_by_time_range(BookingTimeRangeSearch)`,
+  `search_by_timeslot(timeslot_id, options=None)`, `get_guests(id)` → `list[Guest]`,
+  `get_meta_data(id)` → `list[MetaData]` (booking custom-field responses, `[]` when
+  not found; each `MetaData` carries a typed `value: MetaDataValue | None`
+  discriminated union keyed by `kind` plus a display-safe `display_value` string
+  on the `MetaData` itself (the `html` value's is HTML-escaped); returns only
+  fields whose slug starts with `integrators:<integrator>:`, that prefix
+  stripped). The `integrator` arg on the accessor scopes `get_meta_data` —
+  **do not set it** unless Peek engineering created a custom integrator id for
+  this integration.
+  Eight metadata setters (fixed field name, caller supplies the value;
+  integrator-scoped; return `SetMetaDataResult(success, booking_id, message)`;
+  not PII-gated): `set_meta_data_guest(id, guests: Sequence[SetMetaDataGuestInput])`
+  (name+email required), `set_meta_data_attachment(id, attachments:
+  Sequence[SetMetaDataAttachmentInput])` (name+attachment_url required),
+  `set_meta_data_manifest_url(id, url)`, `set_meta_data_reservation_id(id,
+  reservation_id)`, `set_meta_data_booking_status(id, status)`,
+  `set_meta_data_assigned_product(id, product_name)`,
+  `set_meta_data_assigned_employee(id, employee_name)`,
+  `set_meta_data_insurance_purchased(id, insurance_purchased: bool)`.
+  `get_payments_on_file(id)` → `BookingPaymentsOnFile | None`,
+  `append_note(id, note, mode="append")` (`NoteMode` `"append"`/`"overwrite"`)
+  → `Booking | None`, `set_checkin_status(id, checked_in: bool)` → `Booking | None`,
+  `update_custom_status(id, custom_status)` → `bool` (sets the operator custom
+  status; not PII-gated), `cancel(id, notes="Canceled")` → `CancelBookingResult`,
+  `make_payment(MakePaymentInput)` → `MakePaymentResult`, `refund(RefundInput)` →
+  `RefundResult`, `create_invoice_link(id)` → `InvoiceLinkResult`,
+  `list_addons(id)` → `BookingAddons`, `add_addon(id, AddAddonInput(addon_option_id,
+  quantity))` and `remove_addon(id, AddAddonInput(...))` → `BookingAddonsMutationResult`,
+  `create(CreateBookingInput)` → `CreatedBooking` (optional `list_price` — total
+  booking price string, commas allowed; split evenly across tickets with the
+  remainder cent on the last, sent per ticket in the activity currency, fallback
+  USD)
+- `get_review_service()` — `get_reviews(product_id, review_count=50, review_offset=0)`
+  (single newest-first page of `Review`s, count 1–50, offset ≥ 0);
+  `get_all_review_summaries()` → `list[ProductReviewSummary]` (one per activity:
+  `avg_rating` — decimal, `None` when no ratings — plus `count_total` and per-star
+  `count_one_star`…`count_five_star`). No PII; unaffected by `full_customer_access`.
+
+Access-level: `verify_peek_auth_token(token)` → `PeekAuthTokenClaims(install_id,
+display_version, user: PeekAuthTokenUser | None)`; `aclose()`; `async with`.
+
+## Sibling accessors (CNG, ACME)
+
+Two brand-parallel accessors sit alongside `PeekAccessService` and share the same
+auth/transport plumbing. Both are deliberately minimal today (products only).
+Construct one per install, same config shape **minus the Peek-only fields**
+(`CngAccessServiceConfig` / `AcmeAccessServiceConfig` are aliases of
+`BaseAccessServiceConfig`: `install_id`, `jwt_secret`, `issuer`, `api_url`, …).
+With `api_url` set, it is the base API URL and the product service appends its
+backoffice slug (`cng_backoffice_api-v1` / `acme_backoffice_api-v1`) and the
+path; the deprecated `base_url`/`app_id` fall back to the app-registry default
+(`<base_url>/<app_id>` as the base). `create_access_service_for_install` routes
+`platform` `"cng"`/`"acme"` to these. Both support `aclose()` / `async with`.
+
+- `CngAccessService` — `get_product_service().get_all_activities()` →
+  `list[Activity]` (`Activity`/`ActivityTicket` models). Only
+  `product_id`/`name`/`color` are populated: `type` is always `"ACTIVITY"` and
+  `tickets` is always empty (CNG's products endpoint exposes neither). Only
+  active products are returned. Errors surface as `CngApiError`, except HTTP
+  403 — a missing app permission — which surfaces as `CngPermissionError`
+  (`.permissions` lists the permission names, e.g. `["products:read"]`; logged
+  at `warn`, meant to be caught and shown to the operator).
+- `AcmeAccessService` — `get_product_service().get_all_activities()` →
+  `list[AcmeActivity]` (`AcmeActivity`/`AcmeActivityTicket` models; published
+  templates only). Errors surface as `AcmeApiError`.
+
+All are exported from the package root `peek_app_utilities`; paths and raw
+response shapes stay internal.
+
+## Input conventions (enforced in the service layer; violations raise `ValueError`)
+
+- Booking ids must be `b_…` (lowercase db id) or `B-…` (uppercase display id);
+  they are normalized (lowercased, `-`→`_`) so `B-ABC123` == `b_abc123`. Order
+  ids likewise `o_…`/`O-…`. Mixed forms are rejected.
+- Quantities: positive-integer strings (`"1"`, `"2"`).
+- Currency: 3-letter uppercase ISO (`"USD"`). Amounts: numeric strings (`"25.00"`).
+- Payment source ids: `ps_…` or `cash/cash` | `custom/other` | `custom/voucher`.
+  Payment ids (refunds): `pmt_…`.
+- Idempotency key required on `make_payment`, `refund`, `create(... mark_as_paid=True)`.
+- `create()` uses pre-resolved ids for product/ticket/time (resolve via product
+  + availability services); no free-text matching there. The one exception is
+  `CreateBookingInput.custom_question_answers: list[CustomQuestionAnswerInput] | None`
+  (`question_id_or_text`, `value`): when supplied, the activity's custom
+  questions are fetched and each answer is matched (id or lenient text) and
+  validated by type (checkbox `yes/no/true/false`; text verbatim;
+  select-one/location by option id or lenient label) before the quote is made —
+  an unmatched/ambiguous question or option, or an invalid checkbox value,
+  fails creation up front. Per-guest questions are not yet supported (answering
+  one fails creation). `require_required_questions: bool | None` (default
+  `False`) additionally enforces that every required (non-per-guest) custom
+  question is answered — validation runs even when `custom_question_answers`
+  is empty/omitted. `accept_all_custom_question_ids: bool | None` (default
+  `False`) relaxes the id check: a `cq_…` id not in the activity's question list
+  is accepted as a plain text answer instead of failing creation (by-name
+  answers still must match). When every answer is by id (and no required check
+  runs) the questions fetch is skipped entirely.
+
+## Errors
+
+- Every package error derives from `AppUtilitiesError`:
+  `AdminAccountRequiredError` (HTTP 418, `.status_code`), `RateLimitError` (HTTP
+  429 after retries, `.status_code`), `PeekGraphQLError` (`.graphql_errors` holds
+  the raw list — a resolver-level failure), `PeekHttpError` (a non-2xx status
+  other than 418/429 with no GraphQL `errors` — e.g. 401/404/5xx; carries
+  `.status_code`, `.url`, and raw `.body`; a non-JSON error page keeps its
+  status), `PiiAccessDisabledError` (a payment/booking-modification op was
+  called without `full_customer_access`; `.operation`), the REST-sibling
+  `CngApiError` / `AcmeApiError` (`.status_code`, `.body`), and
+  `CngPermissionError` (CNG HTTP 403; `.permissions`, `.status_code`, raw
+  `.body`) — all importable; branch with `except`.
+- Token verification (`verify_peek_auth_token`, `parse_install_webhook`) raises
+  PyJWT's `jwt.InvalidTokenError` subclasses (`ExpiredSignatureError`,
+  `InvalidSignatureError`, `InvalidIssuerError`, `InvalidAudienceError`,
+  `DecodeError`, …). Claim extraction never raises once the signature verifies:
+  a missing `user` block gives `user=None`, and each user field (including
+  `id`, the person's own id — not an account/partner id) is nullable, with
+  `""`/`"null"` normalized to `None`.
+- `ValueError` for validation/precondition failures raised before any request.
+
+## Logging
+
+`Logger` is a protocol with `info(message, context=None)` / `warn(...)` /
+`error(...)`. Default is `noop_logger` (silent). `logging_adapter(logging_logger)`
+wraps a standard-library `logging.Logger`, forwarding the context mapping as
+`extra={"context": {...}}`.
+
+## Webhooks (booking + waiver + install)
+
+Two pure-transform parsers plus one verify-and-parse call. The pure parsers need
+no auth/network/`PeekAccessService`; accept the `{<key>: …}` envelope, a bare
+node, or a JSON string; never raise on malformed input. Registration is done
+**once in an external system** (App Store config), not from code.
+
+- `parse_booking_webhook(body) -> Booking` — auto-detects guests/breakdown.
+  Booking payload shape is defined by a GraphQL selection registered externally;
+  paste the canonical maximal selection into `output_fields_gql_query`. That
+  string is documented in `docs/webhooks.md` and pinned by a drift-guard test —
+  it is NOT a runtime export.
+- `parse_waiver_webhook(body, options=None) -> Waiver` — maps the fixed
+  `snake_case` `waiver_webhook_data` payload to the clean `Waiver` model. **No
+  query to register** — just subscribe to the `agreement_signature_created`
+  event. Takes the same `AccessOptions`; by default (`full_customer_access` off)
+  `guest_name` is `None` and `file_url` is `""` — pass
+  `AccessOptions(full_customer_access=True)` to keep them.
+- `parse_install_webhook(token, body, secret) -> InstallWebhook` — the install
+  webhook delivers **two payloads at once**: a signed `app_registry_v2` JWT and a
+  JSON body. This **verifies** the token (HMAC signature + expiry +
+  `app_registry_v2` issuer + `Joken` audience — same checks as
+  `verify_peek_auth_token`, raising the underlying PyJWT error on failure, one
+  `except jwt.InvalidTokenError` → `401`) and merges both into one flat,
+  JSON-safe `InstallWebhook`: `install_id`, `account_id` (**also called the
+  partner ID**), `account_name`, `platform`, `is_test`, `timezone`, `api_url`,
+  `status`, `raw_status`, `display_version`, `user` (nullable, for
+  system-initiated events). The **JSON body is the source of the event data**;
+  the fields it shares with the token (`install_id`/`account_id`/`status`/
+  `display_version`/`user`) fall back to the **verified token** when the body
+  omits them. The token authenticates the whole delivery, so the body is
+  trusted within a verified request. This webhook is the **only** source of
+  `account_id`, `timezone`, and `api_url` in the package — no API read returns
+  them; **persist them per install**. `status` and `platform` are **nullable**:
+  a value this version does not recognise maps to `None` (wire value kept on
+  `raw_status`) rather than being coerced, because Peek does not redeliver a
+  2xx and a coerced status silently drops a lifecycle transition. Give both a
+  fall-through branch that fails loudly. `token` is Peek's `x-peek-auth`
+  request header value — pass it as-is, a `Bearer ` prefix is stripped for you.
+  `secret` is the app's `jwt_secret`, app-wide, so it verifies fine on a
+  brand-new install before any record exists. No query to register; just
+  subscribe to the event.
+  - The TypeScript package's deprecated `verifyInstallWebhook` was **not
+    ported**; `parse_install_webhook` is the only install-webhook entry point.
+
+**Full guide + booking query-to-register: `docs/webhooks.md` (shipped).**
+
+## Notes for consumers
+
+- Install from PyPI: `pip install peek-app-utilities` / `uv add peek-app-utilities`.
+  See README "Install".
+- Public entry point: the package root `peek_app_utilities`. Everything under
+  `peek_app_utilities.internal` is internal — rely on the root barrel, don't
+  deep-import internal modules.
+- Not ported from `@peektravel/app-utilities`: the deprecated top-level
+  short-form proxies on the access services (use `get_<resource>_service()`),
+  `verifyInstallWebhook`, and the browser UI components (`/ui`).

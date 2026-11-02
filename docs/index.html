@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>peek-app-utilities — Reference</title>
+<script>(function(){try{var u=new URLSearchParams(location.search).get("theme");var s=u||localStorage.getItem("theme");var t=(s==="light"||s==="dark")?s:"light";document.documentElement.setAttribute("data-theme",t);if(u==="light"||u==="dark"){try{localStorage.setItem("theme",u);}catch(e){}}}catch(e){}})();</script>
+<style>
+  :root{
+    --bg:#0d1117; --panel:#161b22; --panel2:#1c2330; --border:#2a3441;
+    --text:#e6edf3; --muted:#8b949e; --accent:#58a6ff; --accent2:#3fb950;
+    --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
+  }
+  html[data-theme="light"]{
+    --bg:#f6f8fa; --panel:#ffffff; --panel2:#eef1f5; --border:#d0d7de;
+    --text:#1f2328; --muted:#59636e; --accent:#0969da; --accent2:#1a7f37;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;min-height:100%}
+  body{background:var(--bg);color:var(--text);font:15px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;display:flex;flex-direction:column;align-items:center;padding:0 20px 80px}
+  a{color:var(--accent);text-decoration:none}
+  code{font-family:var(--mono)}
+  header{width:100%;max-width:860px;padding:56px 0 8px}
+  header h1{margin:0 0 6px;font-size:30px;letter-spacing:.2px}
+  header .tag{display:inline-block;font-size:12px;color:var(--bg);background:var(--accent2);padding:2px 9px;border-radius:10px;font-weight:600;font-family:var(--mono)}
+  header .pkgbadge{display:inline-block;font-size:12px;color:var(--muted);border:1px solid var(--border);padding:2px 9px;border-radius:10px;font-family:var(--mono);margin-left:6px}
+  header p{color:var(--muted);max-width:720px;margin:14px 0 0}
+  .themebtn{position:fixed;top:16px;right:18px;background:var(--panel2);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:4px 11px;cursor:pointer;font-size:15px}
+  .themebtn:hover{border-color:var(--accent);color:var(--accent)}
+  h2.section{width:100%;max-width:860px;margin:44px 0 6px;font-size:13px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);border-bottom:1px solid var(--border);padding-bottom:10px}
+  .grid{width:100%;max-width:860px;display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:18px;margin-top:18px}
+  a.platform{display:block;background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:22px 22px 20px;transition:border-color .12s,transform .12s}
+  a.platform:hover{border-color:var(--accent);transform:translateY(-2px)}
+  a.platform .name{font-size:20px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:10px}
+  a.platform .arrow{margin-left:auto;color:var(--muted);font-size:18px}
+  a.platform:hover .arrow{color:var(--accent)}
+  a.platform .kind{font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:2px}
+  a.platform .blurb{color:var(--muted);font-size:13.5px;margin-top:12px}
+  footer{width:100%;max-width:860px;margin-top:48px;color:var(--muted);font-size:12.5px;border-top:1px solid var(--border);padding-top:16px}
+  .terminal{width:100%;max-width:860px;margin-top:18px;background:#0b0f14;border:1px solid #2a3441;border-radius:12px;overflow:hidden;font-family:var(--mono)}
+  .terminal .tbar{display:flex;align-items:center;gap:7px;padding:9px 14px;border-bottom:1px solid #1f2630;background:#11161d}
+  .terminal .tbar i{width:11px;height:11px;border-radius:50%;display:inline-block}
+  .terminal .tbar i.r{background:#ff5f57}.terminal .tbar i.y{background:#febc2e}.terminal .tbar i.g{background:#28c840}
+  .terminal .tbar .ttl{margin-left:8px;color:#8b949e;font-size:12px}
+  .terminal .tbar .copy{margin-left:auto;background:#1c2330;border:1px solid #2a3441;color:#c9d1d9;border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;font-family:inherit}
+  .terminal .tbar .copy:hover{border-color:#58a6ff;color:#58a6ff}
+  .terminal pre{margin:0;padding:16px 18px;color:#e6edf3;font-size:13px;line-height:1.7;overflow-x:auto;white-space:pre}
+  .terminal .p{color:#3fb950;user-select:none}
+  .terminal .c{color:#8b949e}
+  .terminal .pkg{color:#79c0ff}
+  p.installnote{width:100%;max-width:860px;color:var(--muted);font-size:13.5px;margin:18px 0 0}
+</style>
+</head>
+<body>
+<button id="themeBtn" class="themebtn" title="Toggle light/dark" aria-label="Toggle theme">◐</button>
+<header>
+  <span class="tag">peek-app-utilities</span>
+  <span class="pkgbadge">Python · PyPI package</span>
+  <h1>Reference</h1>
+  <p>Interactive reference for the top-level service classes and the clean dataclass models each returns — the Python port of <code>@peektravel/app-utilities</code>.</p>
+</header>
+
+<h2 class="section">Available Platforms</h2>
+<div class="grid" id="grid">
+  <a class="platform" href="html/peek.html" data-base="html/peek.html">
+    <div class="name">Peek <span class="arrow">→</span></div>
+    <div class="kind">peek_app_utilities.models.peek</div>
+    <div class="blurb">The Peek backoffice — bookings, products, timeslots, pricing, memberships, reviews, and more, rooted at <code>PeekAccessService</code>.</div>
+  </a>
+  <a class="platform" href="html/cng.html" data-base="html/cng.html">
+    <div class="name">CNG <span class="arrow">→</span></div>
+    <div class="kind">peek_app_utilities.models.cng</div>
+    <div class="blurb">The CNG backoffice. Rooted at <code>CngAccessService</code>, exposing the <code>CngProductService</code> and the <code>Activity</code> model.</div>
+  </a>
+  <a class="platform" href="html/acme.html" data-base="html/acme.html">
+    <div class="name">ACME <span class="arrow">→</span></div>
+    <div class="kind">peek_app_utilities.models.acme</div>
+    <div class="blurb">The ACME backoffice. Rooted at <code>AcmeAccessService</code>, exposing the <code>AcmeProductService</code> and the <code>AcmeActivity</code> model.</div>
+  </a>
+</div>
+
+<h2 class="section">Install</h2>
+<div class="terminal">
+  <div class="tbar">
+    <i class="r"></i><i class="y"></i><i class="g"></i>
+    <span class="ttl">bash</span>
+    <button class="copy" id="copyInstall" data-cmd="pip install peek-app-utilities">Copy</button>
+  </div>
+<pre><span class="p">$</span> pip install <span class="pkg">peek-app-utilities</span>
+
+<span class="c"># …or with uv / poetry</span>
+<span class="p">$</span> uv add <span class="pkg">peek-app-utilities</span>
+<span class="p">$</span> poetry add <span class="pkg">peek-app-utilities</span></pre>
+</div>
+
+<p class="installnote">Then import what you need from the package root — the access services, their configs, the webhook parsers, and the data models (Python 3.11+, async only):</p>
+<div class="terminal">
+  <div class="tbar"><i class="r"></i><i class="y"></i><i class="g"></i><span class="ttl">app entry · Python</span></div>
+<pre><span class="c"># access service + config + data models</span>
+from <span class="pkg">peek_app_utilities</span> import PeekAccessService, PeekAccessServiceConfig
+
+<span class="c"># every I/O method is a coroutine; the access service is an async context manager</span>
+async with PeekAccessService(PeekAccessServiceConfig(...)) as peek:
+    products = await peek.get_product_service().get_all_products()</pre>
+</div>
+
+<footer>
+  <div>All three siblings share the same auth, retry/backoff, logging, and base error types — callers touch only the access services and the clean dataclass models.</div>
+  <div style="margin-top:10px"><a href="https://github.com/peek-travel/app-utilities-py" target="_blank" rel="noopener">GitHub — peek-travel/app-utilities-py ↗</a></div>
+</footer>
+
+<script>
+  // carry the theme choice across pages via ?theme= (file:// localStorage is isolated in some browsers)
+  function syncThemeLinks(t){
+    document.querySelectorAll('a.platform').forEach(a=>{
+      a.setAttribute('href', a.getAttribute('data-base')+'?theme='+t);
+    });
+  }
+  syncThemeLinks(document.documentElement.getAttribute('data-theme')||'light');
+  const tb=document.getElementById('themeBtn');
+  if(tb)tb.addEventListener('click',()=>{
+    const cur=document.documentElement.getAttribute('data-theme')==='light'?'dark':'light';
+    document.documentElement.setAttribute('data-theme',cur);
+    try{localStorage.setItem('theme',cur);}catch(e){}
+    syncThemeLinks(cur);
+  });
+
+  // copy the install command
+  const ci=document.getElementById('copyInstall');
+  if(ci)ci.addEventListener('click',()=>{
+    const cmd=ci.getAttribute('data-cmd');
+    const done=()=>{const o=ci.textContent;ci.textContent='Copied';setTimeout(()=>{ci.textContent=o;},1200);};
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(cmd).then(done).catch(done);}
+    else{try{const t=document.createElement('textarea');t.value=cmd;document.body.appendChild(t);t.select();document.execCommand('copy');document.body.removeChild(t);done();}catch(e){}}
+  });
+</script>
+</body>
+</html>
