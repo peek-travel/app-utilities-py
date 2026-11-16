@@ -25,9 +25,10 @@ checks the signature for you before returning the merged event.
 `app_registry_v2` JWT authenticates the notification; a plain JSON body alongside
 it carries the **event data** — the full account block (name, platform,
 timezone, test flag), the per-install `api.url`, the acting user, and the install
-id / status / version. `parse_install_webhook` verifies the token and reads the
-event from the body — falling back to the token for the fields it also carries —
-merging both into one flat `InstallWebhook`, so you make a single call.
+id / status / version. `parse_install_webhook` verifies the token, takes the
+install id from the token `sub`, and reads the rest of the event from the body —
+falling back to the token for the fields it also carries — merging both into one
+flat `InstallWebhook`, so you make a single call.
 
 All three parsers are plain synchronous functions (no `await`) that accept the
 raw request body as a mapping or a JSON string. The examples below use FastAPI
@@ -205,10 +206,24 @@ and the only place it ever learns it: no API read returns the account id, so
 whatever you persist from this delivery is all you will ever have.
 
 `parse_install_webhook(token, body, secret)` verifies the token (issuer, audience,
-expiry, HMAC — the security-critical boilerplate you'd otherwise hand-roll) and
-reads the event from the body, **falling back to the token** for the fields it
-also carries (`install_id`, `account_id`, `status`, `display_version`, `user`),
-returning one flat, JSON-safe `InstallWebhook` you store as a unit.
+expiry, HMAC — the security-critical boilerplate you'd otherwise hand-roll),
+takes `install_id` from the token `sub`, and reads the rest of the event from the
+body, **falling back to the token** for the fields it also carries (`account_id`,
+`status`, `display_version`, `user`), returning one flat, JSON-safe
+`InstallWebhook` you store as a unit.
+
+**`install_id` is always the token `sub`.** The body `install_id` never sets it.
+When the body carries a non-empty `install_id` that is not equal to `sub`, the
+parser raises `InstallWebhookError` (`reason="install_id_mismatch"`). A verified
+token with no `sub` raises `InstallWebhookError` (`reason="missing_subject"`).
+When the body carries a non-empty `api.url` whose host is not a Peek-owned domain
+(`peek.com` production or `peeklabs.com` sandbox, or a subdomain of either), the
+parser raises `InstallWebhookError` (`reason="invalid_api_url"`) — so a spoofed
+webhook can't point your app at a foreign gateway; a value without a scheme is
+treated as `https`, and an absent `api_url` is not validated.
+`InstallWebhookError` subclasses PyJWT's `jwt.InvalidTokenError` (and the
+package's `AppUtilitiesError`); `.reason` is the `InstallWebhookErrorReason`
+`Literal`. A body without `install_id` parses normally.
 
 ## Step 1 — subscribe to the event (external, one-time)
 
@@ -243,7 +258,9 @@ async def install_webhook(request: Request, x_peek_auth: str = Header("")) -> Re
             x_peek_auth, await request.json(), os.environ["PEEK_INTERNAL_SECRET"]
         )
     except jwt.InvalidTokenError:
-        return Response(status_code=401)  # signature/issuer/audience/expiry failed
+        # token check failed, or the body names another install / a non-Peek
+        # api_url (InstallWebhookError — itself a jwt.InvalidTokenError)
+        return Response(status_code=401)
 
     match event.status:
         case "installed":
@@ -266,32 +283,38 @@ async def install_webhook(request: Request, x_peek_auth: str = Header("")) -> Re
 underlying PyJWT error — a `jwt.InvalidTokenError` subclass such as
 `ExpiredSignatureError`, `InvalidSignatureError`, `InvalidIssuerError`,
 `InvalidAudienceError`, or `DecodeError` — on any verification failure, so a
-single `except jwt.InvalidTokenError` → `401` covers every bad-token case. The
-signature checks are strict (they are the security boundary); claim *extraction*
-is defensive, so a validly-signed token or a missing/garbled body yields empty
-fields rather than raising.
+single `except jwt.InvalidTokenError` → `401` covers every bad-token case. It
+also raises `InstallWebhookError` when the token has no `sub`, the body
+`install_id` is not equal to it, or the body `api_url` is not a Peek-owned
+domain. `InstallWebhookError` subclasses `jwt.InvalidTokenError`, so the same
+`except jwt.InvalidTokenError` → `401` covers that (branch on `.reason` only if
+you want to log the cause). The signature checks are strict (they are the
+security boundary); the other claim *extraction* is defensive, so a
+validly-signed token or a missing/garbled body yields empty fields rather than
+raising.
 
 The resulting `InstallWebhook` is flat:
 
 | Field | Type | Source | From | Notes |
 | --- | --- | --- | --- | --- |
-| `install_id` | `str` | body → token | `install_id` / `sub` | Peek-assigned install UUID |
+| `install_id` | `str` | token | `sub` | Peek-assigned install UUID; a body `install_id` must equal it |
 | `account_id` | `str` | body → token | `account.id` | **also called the partner ID** |
 | `account_name` | `str` | body | `account.name` | partner display name; `""` when absent |
 | `platform` | `PeekPlatform \| None` | body | `account.platform` | **persist per install** — see below; `None` when unrecognised |
 | `is_test` | `bool` | body | `account.is_test` | defaults to `False` |
 | `timezone` | `str` | body | `account.timezone` | IANA zone (e.g. `America/New_York`); **persist per install**; `""` when absent |
-| `api_url` | `str` | body | `api.url` | per-install backoffice API base URL; **persist per install**; `""` when absent |
+| `api_url` | `str` | body | `api.url` | per-install backoffice API base URL; **persist per install**; `""` when absent; a non-empty value must be a Peek-owned domain (`peek.com`/`peeklabs.com`) or the parser raises |
 | `status` | `InstallStatus \| None` | body → token | `status` | `None` when unrecognised — see below |
 | `raw_status` | `str` | body → token | `status` | always the wire value, for logging |
 | `display_version` | `str` | body → token | `display_version` | `""` when absent |
 | `user` | `PeekAuthTokenUser \| None` | body → token | `modified_by` / `user` | `None` for system-initiated events |
 
-The **JSON body is the source of the event data**; the fields it shares with the
-token (`install_id`, `account_id`, `status`, `display_version`, `user`) fall back
-to the **verified token** when the body omits them. The token authenticates the
-whole delivery — only Peek can mint a valid one — so the body is trusted within a
-verified request. `user` is nullable here — as it is on `verify_peek_auth_token`
+The **JSON body is the source of the other event data**; the fields it shares
+with the token (`account_id`, `status`, `display_version`, `user`) fall back to
+the **verified token** when the body omits them. The token authenticates the
+whole delivery — only Peek can mint a valid one — and names the install (`sub`),
+so the body is trusted within a verified request once it agrees on the install
+id. `user` is nullable here — as it is on `verify_peek_auth_token`
 — because install lifecycle events are often system-initiated (no acting user),
 so the parser tolerates a missing `modified_by`/`user`, and every field inside a
 present `user` is itself nullable (a sentinel `""`/`"null"` id becomes `None`).
@@ -407,6 +430,12 @@ It raises `ValueError` if `install.platform` is `None` or unrecognised — an
 install with an unknown platform has no service to route to, and silently
 defaulting would point it at the wrong backoffice.
 
+`create_access_service_for_install` sets Peek's **required** `mode="v2"` for you
+(a registry install is always the v2 connection). If you construct
+`PeekAccessService` by hand instead, `mode` is mandatory — pass `mode="v2"`
+together with the `api_url`. (`mode="v1"` is the deprecated legacy gateway and
+needs `app_id` + `gateway_key`; see the README's *Connection mode* section.)
+
 Prefer this (or the config's `api_url` field) over `base_url`/`app_id`, which are
 deprecated: they reconstruct the URL with a hardcoded default that cannot be
 correct for every install. **The hardcoded base-URL fallbacks will be removed and
@@ -415,8 +444,9 @@ webhook's `api_url` now.
 
 ## Why `status` and `platform` can be `None`
 
-`parse_install_webhook` never raises on the *body* (only token verification can
-raise). The sender is first-party and the payload contract is Peek's own, so a
+`parse_install_webhook` never raises on the body's *event data* (only token
+verification, the install-id check, and the `api_url` domain check can raise).
+The sender is first-party and the payload contract is Peek's own, so a
 malformed body is not the failure worth designing for. The failure that *is* real
 is the contract **growing** — a new status, or a fourth platform.
 

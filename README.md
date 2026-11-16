@@ -48,7 +48,8 @@ async def main() -> None:
             install_id="install-123",  # JWT subject
             jwt_secret=os.environ["PEEK_INTERNAL_SECRET"],  # signs the JWT
             issuer=os.environ["APP_NAME"],  # JWT issuer
-            api_url=install.api_url,  # the install webhook's api_url
+            mode="v2",  # connection generation — required (see below)
+            api_url=install.api_url,  # per-install base URL from the install webhook (persisted)
         )
     ) as peek:
         products: list[Product] = await peek.get_product_service().get_all_products()
@@ -60,20 +61,60 @@ context manager (or call `await peek.aclose()` when you are done) so the HTTP
 client it owns is closed; a client you pass in yourself via `http_client` is
 never closed by the package.
 
+### Connection mode (`v1` / `v2`) — **required**
+
+`mode` is a **mandatory** config field — you must choose a connection generation
+explicitly. (It used to be optional, defaulting to `v1`; it is now required so
+that updating the package forces a deliberate choice instead of silently keeping
+the old behaviour. Omitting it fails dataclass construction, and any value other
+than `"v1"`/`"v2"` makes the constructor raise `ValueError`.)
+
+- **`mode="v2"`** — **use this going forward.** The app-registry connection. It
+  **requires** the install's `api_url` — the per-install base URL delivered on
+  the install webhook (`api.url`); the constructor raises `ValueError` without
+  it. Persist that URL per install (see [Webhooks](#webhooks)) and pass it as
+  `api_url`; no `gateway_key` is needed. If you don't yet have a webhook
+  `api_url` (e.g. an older install you don't want to uninstall/reinstall just to
+  get one), build one by appending your **app slug** to the registry prefix and
+  pass that as the `api_url` yourself —
+  `https://apps.peek.com/installations-api/<app-slug>` (same shape as the
+  webhook's `api.url`; the trailing app-slug segment is required — the prefix
+  alone is not a valid URL). Treat it as a transitional bridge and move to the
+  webhook URL.
+- **`mode="v1"`** — **deprecated; will be removed.** The legacy gateway; needs
+  `app_id` + `gateway_key`. If your install relied on the previous default, the
+  fastest no-behaviour-change update is to pass `mode="v1"` — then plan the
+  migration to `v2`.
+
+```python
+# Legacy v1 (deprecated) — fastest update for an install that used the old default:
+peek = PeekAccessService(
+    PeekAccessServiceConfig(
+        install_id="install-123",
+        jwt_secret=os.environ["PEEK_INTERNAL_SECRET"],
+        issuer=os.environ["APP_NAME"],
+        app_id=os.environ["PEEK_APP_ID"],  # gateway path segment
+        gateway_key=os.environ["PEEK_GATEWAY_KEY"],  # pk-api-key header
+        mode="v1",
+    )
+)
+```
+
 `get_all_products()` returns a single flat list of activities **and** add-ons
 (add-ons tagged with `ADD_ON_PRODUCT_TYPE`), gathering all cursor-paginated
 add-on pages for you.
 
 ### Targeting an install
 
-Pass the install webhook's `api_url` as the config `api_url`. It is the
-install's **base API URL**; each service appends its own routing slug when it
-makes a call. If the URL you pass already carries this platform's slug it is
-stripped back to the base; a URL carrying a *different* platform's slug is
-rejected (the constructor raises `ValueError`). `app_id` / `base_url` / `mode`
-are still accepted for the legacy gateway route but are deprecated — prefer
-`api_url`, or hand the whole install to
-[`create_access_service_for_install`](#building-the-access-service-from-an-install).
+Pass the install webhook's `api_url` as the config `api_url` (together with
+`mode="v2"`). It is the install's **base API URL**; each service appends its own
+routing slug when it makes a call. If the URL you pass already carries this
+platform's slug it is stripped back to the base; a URL carrying a *different*
+platform's slug is rejected (the constructor raises `ValueError`). `app_id` /
+`base_url` are still accepted for the legacy `mode="v1"` route but are
+deprecated — prefer `api_url`, or hand the whole install to
+[`create_access_service_for_install`](#building-the-access-service-from-an-install),
+which sets `mode="v2"` for you.
 
 ## Resources
 
@@ -91,6 +132,8 @@ are still accepted for the legacy gateway route but are deprecated — prefer
 | `get_membership_service()` | `get_all()`, `purchase(input)` |
 | `get_booking_service(integrator=None)` | `get_by_id()`, `search_by_time_range()`, `search_by_timeslot()`, `get_guests()`, `get_meta_data()`, `set_meta_data_*()` (8 field setters), `get_payments_on_file()`, `append_note()`, `set_checkin_status()`, `update_custom_status()`, `cancel()`, `make_payment()`, `refund()`, `create_invoice_link()`, `list_addons()`, `add_addon()`, `remove_addon()`, `create()` |
 | `get_review_service()` | `get_reviews(product_id, review_count=50, review_offset=0)`, `get_all_review_summaries()` |
+| `get_custom_question_service()` | `get_all()` — every custom question defined on the account, across all activities (`order` is `0` and `is_required` is `False`; definitions, not answers) |
+| `get_seatmap_service()` | `get_seatmap_for_product(product_id)` — every seating map on an activity (zones, sections, tables, seats); `get_seatmap_ids_for_product(product_id)` — just each map's `id`/`name`; `get_seat_map_assignments(product_id, range_start, range_end)` — the maps with per-seat occupancy over a datetime range; `assignable_bookings(product_id, range_start, range_end)` — confirmed bookings overlapping the range with their seat-assignable tickets; `assign_tickets_to_seats(assignments)` — bulk ticket→seat assignment (`SUCCESS`/`PARTIAL`/`FAILED`); `delete_seat_assignments(assignment_ids)` — clear seats by `asa_…` id |
 
 > `get_booking_service(integrator=None)` takes an optional `integrator` string
 > that scopes `get_meta_data()` results. **Do not set it** unless Peek
@@ -99,17 +142,25 @@ are still accepted for the legacy gateway route but are deprecated — prefer
 Every input and output is a frozen `@dataclass` (keyword-only), so calls read
 as `await service.create(CreateBookingInput(activity_id=..., ...))` and results
 are plain attribute access (`booking.display_id`). Missing/absent values are
-`None`.
+`None`. Monetary values shared across resources — a booking add-on's `total`,
+an `AvailabilityTime.price` — use the single exported `Money` dataclass
+(`amount` as a decimal string, `currency`, `formatted`).
+
+Seat occupancy reads (`get_seat_map_assignments`, `assignable_bookings`) carry a
+`guest_name` that is **customer PII** — it is `None` unless the access service
+was created with `full_customer_access` (see [Access options /
+PII](#access-options--pii)). Seating-map layouts and custom-question definitions
+carry no PII and are unaffected by the flag.
 
 ### Optional configuration
 
 | Option | Default | Purpose |
 | --- | --- | --- |
-| `api_url` | — | The install's base API URL (from the install webhook). Preferred over `base_url`/`app_id` |
-| `base_url` | Peek production gateway | Override the legacy gateway base URL (**deprecated**) |
-| `app_id` | — | Legacy gateway path segment, required only without `api_url` (**deprecated**) |
-| `gateway_key` | — | `pk-api-key` header, required only on the legacy v1 gateway route |
-| `mode` | `None` | `"v2"` selects the legacy app-registry route; superseded by `api_url` |
+| `mode` | **required** | `"v2"` (app-registry connection, needs `api_url`) or `"v1"` (legacy gateway, **deprecated**) — see [Connection mode](#connection-mode-v1--v2--required) |
+| `api_url` | — | The install's base API URL (from the install webhook). **Required with `mode="v2"`**; preferred over `base_url`/`app_id` |
+| `base_url` | Peek production gateway | Override the legacy v1 gateway base URL (**deprecated**) |
+| `app_id` | — | Legacy v1 gateway path segment, required only in `mode="v1"` without `api_url` (**deprecated**) |
+| `gateway_key` | — | `pk-api-key` header, required only in `mode="v1"` without `api_url`; not used by `v2` |
 | `token_ttl_seconds` | `3600` | JWT lifetime |
 | `token_refresh_leeway_seconds` | `60` | Re-mint this long before expiry |
 | `retry_delays_ms` | `(1000, 2000, 4000)` | Backoff for HTTP 429 retries |
@@ -130,8 +181,10 @@ With `full_customer_access` **off** (the default):
   back `None`/empty): booking guest identity (name/email/phone/DOB/postal
   code/GDPR + custom field responses — guests keep only ids and
   participation/opt-in flags), booking custom question answers, the customer
-  `portal_url`, the guest identity fields inside booking metadata, and review
-  reviewer `customer_name`/`customer_email`. Waiver webhooks (a fixed payload
+  `portal_url`, the guest identity fields inside booking metadata, review
+  reviewer `customer_name`/`customer_email`, and the primary-guest `guest_name`
+  on seat occupancy reads (`get_seat_map_assignments` / `assignable_bookings`;
+  staff names are not gated). Waiver webhooks (a fixed payload
   with no query to trim) instead have `guest_name` (→ `None`) and `file_url`
   (→ `""`) redacted at parse time.
 - **Payment / booking-modification operations are disabled** —
@@ -148,6 +201,7 @@ peek = PeekAccessService(
         install_id=install_id,
         jwt_secret=jwt_secret,
         issuer=issuer,
+        mode="v2",
         api_url=api_url,
         access_options=AccessOptions(
             full_customer_access=True
@@ -196,6 +250,21 @@ raises on its own):
   called on an access service created without `full_customer_access` (see
   [Access options / PII](#access-options--pii)). Carries `.operation` (the
   blocked method name, e.g. `"make_payment"`).
+- `InstallWebhookError` — `parse_install_webhook` got a validly signed token
+  but rejected the delivery: the token has no `sub`
+  (`.reason == "missing_subject"`), the body `install_id` is not equal to it
+  (`.reason == "install_id_mismatch"`), or the body `api_url` is not a
+  Peek-owned domain (`.reason == "invalid_api_url"`). It also subclasses PyJWT's
+  `jwt.InvalidTokenError`, so an `except jwt.InvalidTokenError` branch catches
+  it too. Respond `401`.
+- `UnknownSeatmapDisplayTypeError` / `UnknownSeatmapBlockStatusError` /
+  `UnknownSeatmapAssignmentParentError` — a seatmap read returned a
+  `display.type`, seat status, or assignment parent outside the known set
+  (`SEATMAP_DISPLAY_TYPES` / `SEATMAP_BLOCK_STATUSES` / the known parent types);
+  the offending value is on `.type` / `.status` / `.typename`. Catch one if you
+  need to tolerate a newly-added kind.
+- `SeatmapDeleteError` — `delete_seat_assignments` got a batch-level failure
+  back from the API; its explanation is the message.
 - `CngApiError` / `CngPermissionError` / `AcmeApiError` — the CNG and ACME
   equivalents; see [CNG and ACME](#cng-and-acme).
 
@@ -203,7 +272,9 @@ raises on its own):
 `verify_peek_auth_token` and `parse_install_webhook` raise a
 `jwt.InvalidTokenError` subclass (`ExpiredSignatureError`,
 `InvalidSignatureError`, `InvalidIssuerError`, `InvalidAudienceError`,
-`DecodeError`, …) on a bad token. Once a token's signature verifies, claim
+`DecodeError`, …) on a bad token (and `parse_install_webhook` raises the
+package's `InstallWebhookError`, itself a `jwt.InvalidTokenError`, when a
+verified token does not name the delivered install). Once a token's signature verifies, claim
 *extraction* never raises: the whole `user` block may be absent
 (`claims.user is None`) and every field inside it is independently nullable,
 with a sentinel value (`""` or `"null"`) normalized to `None`. `user.id` is the
@@ -263,6 +334,22 @@ before any request):
   booking is created.
 - **Add-on option ids** are ticket ids on products whose `type` is
   `ADD_ON_PRODUCT_TYPE`.
+- **`create()` with `parent_order_id`** (`o_…`/`O-…`) attaches the new booking
+  to that **existing** order instead of creating a new one: the returned
+  `CreatedBooking.order_id` is the id you passed, and `booking_id` /
+  `display_id` / `balance_*` describe the newly added booking (`mark_as_paid`
+  charges that booking's own balance, not the order total).
+- **`create()` with `promo_code`** applies a discount code to the new booking's
+  quote (the API validates and prices it); an empty/whitespace-only value sends
+  none. It **cannot** be combined with `parent_order_id` — attaching to an order
+  creates no new quote, so `create` raises `ValueError` rather than silently
+  dropping the code.
+- **Seat assignment ids:** `assign_tickets_to_seats` takes `assignable_id`s
+  prefixed `t_` (a ticket's `hashid`) and `block_id`s prefixed `csb_`;
+  `delete_seat_assignments` takes `asa_…` ids. Each list must be non-empty.
+  `range_start`/`range_end` on the occupancy reads are naive datetimes
+  (`YYYY-MM-DDTHH:MM[:SS]`; a timezone or fractional seconds is stripped), sent
+  half-open `[start, end)`, and must fall on the same date.
 
 ## Recipes
 
@@ -408,6 +495,9 @@ install with an unknown platform has no service to route to, and silently
 defaulting would point it at the wrong platform. Any object with `platform`,
 `api_url`, and `install_id` attributes satisfies the `InstallAccessTarget`
 protocol, so a parsed `InstallWebhook` or your own install record both work.
+For a `"peek"` install the factory sets the required `mode="v2"` for you (a
+registry install is always the v2 connection), so `InstallAccessConfig` carries
+no `mode`.
 
 ## Webhooks
 
@@ -460,7 +550,9 @@ async def install_webhook(request: Request, x_peek_auth: str = Header("")) -> Re
             x_peek_auth, await request.json(), os.environ["PEEK_INTERNAL_SECRET"]
         )
     except jwt.InvalidTokenError:
-        return Response(status_code=401)  # bad signature / issuer / audience / expired
+        # bad token, or the body names another install / a non-Peek api_url
+        # (InstallWebhookError is a jwt.InvalidTokenError too)
+        return Response(status_code=401)
 
     match event.status:
         case "installed":
@@ -491,17 +583,20 @@ and `"Joken"` audience (the same checks as `verify_peek_auth_token`, raising the
 underlying PyJWT `jwt.InvalidTokenError` subclass), then returns one flat,
 JSON-safe `InstallWebhook`: `install_id`, `account_id` (**also called the
 partner ID**), `account_name`, `platform`, `is_test`, `timezone`, `api_url`,
-`status`, `raw_status`, `display_version`, and a **nullable** `user`. The
-**JSON body is the source of the event data**; the fields it shares with the
-token (`install_id` / `account_id` / `status` / `display_version` / `user`) fall
-back to the **verified token** when the body omits them. The token authenticates
-the whole delivery, so the body is trusted within a verified request. This
-webhook is the only source of `account_id`, `timezone`, and `api_url` in the
-package, since no API read returns them — **persist them per install**.
-`api_url` is the install's **base API URL**: pass it straight through (don't
-reconstruct it from `app_id`) as the access service's `api_url` — or hand the
-whole install to `create_access_service_for_install(install, config)`, which
-picks the service by `platform` and wires the endpoint for you. Every event is a
+`status`, `raw_status`, `display_version`, and a **nullable** `user`.
+**`install_id` is always the token `sub`**: a body `install_id` that is present
+and not equal to it raises `InstallWebhookError`, and so does a token with no
+`sub`. A non-empty `api_url` whose host is not a Peek-owned domain (`peek.com` /
+`peeklabs.com`, or a subdomain) raises `InstallWebhookError` as well. The **JSON
+body is the source of the other event data**; the fields it shares with the
+token (`account_id` / `status` / `display_version` / `user`) fall back to the
+**verified token** when the body omits them. This webhook is the only source of
+`account_id`, `timezone`, and `api_url` in the package, since no API read
+returns them — **persist them per install**. `api_url` is the install's **base
+API URL**: pass it straight through (don't reconstruct it from `app_id`) as the
+access service's `api_url` with `mode="v2"` — or hand the whole install to
+`create_access_service_for_install(install, config)`, which picks the service by
+`platform`, sets `mode="v2"`, and wires the endpoint for you. Every event is a
 **full snapshot** — an `update_installed` carries the same fields as the
 original `installed`, so upsert by `install_id` and take the latest `api_url`.
 `status` and `platform` are **nullable** — a value this version doesn't
@@ -525,16 +620,22 @@ models, same behaviour, same version number. The naming is mechanical —
 differences:
 
 - The TypeScript package's `@deprecated` compatibility shims (the top-level
-  short-form proxies such as `peek.getAllProducts()`, and
-  `verifyInstallWebhook`) are **not** carried over — this is a new package with
-  no existing consumers. Reach everything through the service accessors and
-  `parse_install_webhook`.
+  short-form proxies such as `peek.getAllProducts()`, `verifyInstallWebhook`,
+  the `AddAddonInput.addonId` alias, and the `BookingAddonMoney` alias of
+  `Money`) are **not** carried over — this is a new package with no existing
+  consumers. Reach everything through the service accessors and
+  `parse_install_webhook`, and use `Money` for every money value.
 - The TypeScript package's browser UI components (`/ui`) are not part of the
   Python port.
 
+The same `changelog.md` is also rendered as an interactive page,
+[`docs/html/changelog.html`](docs/html/changelog.html) (generated from the
+Markdown by `scripts/build-changelog-html.mjs` — never edited by hand), linked
+alongside the service/model reference pages from `docs/index.html`.
+
 ## Releasing
 
-Releases are automated. Pushing a `v*` git tag (e.g. `v0.9.4`) triggers
+Releases are automated. Pushing a `v*` git tag (e.g. `v1.3.0`) triggers
 `.github/workflows/publish.yml`, which asserts the tag matches the
 `pyproject.toml` version, builds the sdist + wheel, and publishes to PyPI via
 Trusted Publishing (OIDC) — no API token is stored. The version is bumped in
@@ -546,7 +647,7 @@ a test guards the two against drifting), rename the `## Unreleased` section of
 `changelog.md`, commit, then:
 
 ```bash
-git tag v0.9.4
+git tag v1.3.0
 git push --follow-tags   # the workflow publishes
 ```
 
@@ -580,6 +681,8 @@ tests/                         pytest suite (fakes in tests/conftest.py)
 scripts/gql_cli/               developer CLI against the live API (not packaged)
 docs/webhooks.md               webhook consumer guide (shipped)
 docs/external/pricing-api.md   pricing overrides guide
+docs/html/                     interactive reference pages + the generated changelog.html
 docs/internal/                 maintainer docs (ARCHITECTURE.md, CONVENTIONS.md — not shipped)
+scripts/build-changelog-html.mjs   renders changelog.md → docs/html/changelog.html (Node)
 llms.txt                       AI-agent quickstart (shipped in the sdist)
 ```

@@ -98,10 +98,15 @@ carried over:
 - the top-level short-form proxies on the access services (`peek.getAllProducts()`
   etc.) — callers use `peek.get_product_service().get_all_products()`;
 - `verifyInstallWebhook` (superseded by `parse_install_webhook`);
-- the `AddAddonInput.addonId` alias (use `addon_option_id`).
+- the `AddAddonInput.addonId` alias (use `addon_option_id`);
+- the `BookingAddonMoney` alias of `Money` (1.0.1 kept it `@deprecated` in
+  TypeScript; here `BookingAddon.total` is simply `Money | None` and the alias
+  does not exist — use `Money`).
 
-The deprecated-but-functional config fields `app_id` / `base_url` / `mode`
-**are** ported, because they still select the legacy v1 gateway route.
+The deprecated-but-functional config fields `app_id` / `base_url` **are**
+ported, because they still select the legacy `mode="v1"` gateway route. `mode`
+itself is **required** (`GatewayMode = Literal["v1", "v2"]`, no default) exactly
+as in TypeScript 1.0.0; `"v2"` requires `api_url`.
 
 ## Tests
 

@@ -59,6 +59,19 @@ prefix where the TypeScript harness has one), e.g. `getAllActivities` →
 # Custom questions for an activity
 ./run.sh get_custom_questions 87cdf37f-1872-42cb-b0bd-518312624fc1
 
+# Every custom question defined on the account (the `custom-questions` group)
+./run.sh get_all_custom_questions
+
+# Seating maps (the `seatmaps` group): layout, id/name list, occupancy over a
+# naive datetime range (guest names need --pii), assignable bookings, and the
+# assign / delete writes (JSON params)
+./run.sh get_seatmap_for_product 87cdf37f-1872-42cb-b0bd-518312624fc1
+./run.sh get_seatmap_ids_for_product 87cdf37f-1872-42cb-b0bd-518312624fc1
+./run.sh --pii get_seat_map_assignments 87cdf37f-1872-42cb-b0bd-518312624fc1 2026-11-06T14:00:00 2026-11-06T16:00:00
+./run.sh assignable_bookings 87cdf37f-1872-42cb-b0bd-518312624fc1 2026-11-06T14:00:00 2026-11-06T15:00:00
+./run.sh assign_tickets_to_seats '[{"assignableId":"t_A1","blockId":"csb_A1"}]'
+./run.sh delete_seat_assignments '["asa_9kQ2mNv"]'
+
 # Reviews, page size 5, offset 10 (numbers coerced)
 ./run.sh get_reviews prod_123 5 10
 
@@ -103,7 +116,7 @@ or the call is run with the `--pii` flag.
 | `PEEK_GATEWAY_KEY` | `pk-api-key` header. Required unless `PEEK_API_URL` is set. |
 | `PEEK_APP_ID` | App id — the URL path segment in v1 mode (`<base_url>/<app_id>/sales`). Required unless `PEEK_API_URL` is set. |
 | `PEEK_BASE_URL` | Optional v1 base URL. Defaults to `https://apps.peekapis.com/backoffice-gql`. |
-| `PEEK_API_URL` | Optional install app-endpoint URL. When set it is the sole request URL (routed through the registry slug) and `PEEK_APP_ID` / `PEEK_GATEWAY_KEY` are ignored. |
+| `PEEK_API_URL` | Optional install app-endpoint URL — the `mode="v2"` connection `PeekAccessService` now requires `api_url` for. When set it is the sole request URL (routed through the registry slug) and `PEEK_APP_ID` / `PEEK_GATEWAY_KEY` are ignored. Without it the harness uses the legacy v1 route (`PEEK_BASE_URL`/`PEEK_APP_ID`/`PEEK_GATEWAY_KEY`). |
 | `PEEK_FULL_CUSTOMER_ACCESS` | `1`/`true`/`yes` enables PII-gated calls and PII fields on reads. Same effect as `--pii`. |
 | `PEEK_INTEGRATOR` | Optional integrator id scoping `get_meta_data` results (defaults to `PEEK_APP_ID`). |
 | `PEEK_DEBUG` | `1` prints request diagnostics to stderr (stdout stays pure JSON). |

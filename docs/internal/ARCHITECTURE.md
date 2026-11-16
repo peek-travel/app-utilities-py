@@ -66,10 +66,13 @@ Package root: `src/peek_app_utilities/`. Paths below are relative to it.
 - Takes one `PeekAccessServiceConfig` (a frozen dataclass extending the shared
   `BaseAccessServiceConfig` from `access_service_config.py` with
   `gateway_key` / `mode` / `item_options_page_size`).
-- Validates the required config fields and raises `ValueError` on any empty
-  value: `install_id`, `jwt_secret`, `issuer` always; `app_id` and
-  `gateway_key` only in the legacy `base_url` mode (both are unneeded when
-  `api_url` is set — see the endpoint-URL note below).
+- Validates the config and raises `ValueError`: `mode` must be `"v1"` or
+  `"v2"` (`ERROR_MODE_REQUIRED` — it is a required dataclass field with no
+  default, so omitting it already fails at `PeekAccessServiceConfig(...)` with a
+  `TypeError`); `install_id`, `jwt_secret`, `issuer` must be non-empty always;
+  `"v2"` must carry an `api_url` (`ERROR_V2_API_URL_REQUIRED`); and `app_id` +
+  `gateway_key` must be non-empty only in `"v1"` **without** an `api_url` (both
+  are unneeded when `api_url` is set — see the endpoint-URL note below).
 - Constructs a single shared `TokenManager` and `GraphQLClient`.
 - Exposes one `get_<resource>_service()` accessor per resource. Each is **lazily
   created and memoized** — repeated calls return the same instance.
@@ -105,8 +108,9 @@ Package root: `src/peek_app_utilities/`. Paths below are relative to it.
     guide resolution).
   - `BookingService` receives the product service (for add-on → parent-item
     resolution, custom-question validation, and list-price currency lookup).
-- Optional config: `api_url` (see the endpoint-URL note below), `mode` (`"v2"` —
-  see below), `base_url`, `token_ttl_seconds` (3600),
+- Required config beyond the base fields: `mode` (`GatewayMode =
+  Literal["v1", "v2"]` — see below). Optional config: `api_url` (see the
+  endpoint-URL note below; required with `"v2"`), `base_url`, `token_ttl_seconds` (3600),
   `token_refresh_leeway_seconds` (60), `retry_delays_ms` (`(1000, 2000, 4000)`),
   `logger` (no-op default), `http_client` (package-owned default),
   `item_options_page_size` (50), and `access_options` (see "Access options /
@@ -136,16 +140,28 @@ Package root: `src/peek_app_utilities/`. Paths below are relative to it.
   `gateway_key` isn't required — the registry endpoint authenticates on the JWT,
   like v2). `create_access_service_for_install` (§ below) is the front door for
   the `api_url` path.
-- **Peek registry vs. legacy v1 slug.** Registry modes — an app-endpoint
-  `api_url`, or the deprecated `mode="v2"` — route the `sales` endpoint through
-  the `peek_backoffice_api-v1` slug, so the GraphQL POST hits
-  `<base>/peek_backoffice_api-v1` (no trailing `sales` segment). The legacy v1
-  gateway (default, no `api_url`/`mode`) has no extendable slug, so `sales` sits
-  directly under the base (`<base_url>/<app_id>/sales`) and the default
-  `base_url` is the backoffice-GraphQL gateway; v2's default `base_url` is the
-  app-registry installations API. `api_url`, when set, supersedes
-  `mode`/`base_url` entirely. All other behaviour (JWT auth, headers, retries,
-  resource services) is unchanged.
+- **Peek registry (`"v2"`) vs. legacy (`"v1"`).** `mode` is a **required**
+  `GatewayMode` (`Literal["v1", "v2"]`, defined in `access_service_config.py`)
+  field on `PeekAccessServiceConfig` (it used to be `GatewayMode | None` and
+  default to v1; it is now mandatory, with a constructor guard that raises
+  `ValueError` on any other value so a caller gets a loud, actionable error).
+  `"v2"` routes the `sales` endpoint through the `peek_backoffice_api-v1` slug,
+  so the GraphQL POST hits `<base>/peek_backoffice_api-v1` (no trailing `sales`
+  segment); it **requires** the install's `api_url` (the constructor raises
+  without it — there is no silent default). `V2_FALLBACK_URL_PREFIX`
+  (`https://apps.peek.com/installations-api`, in `peek_access_service.py`) is not
+  applied automatically and is **not a complete URL** — it is only the
+  documented prefix a developer appends their **app slug** to
+  (`<prefix>/<app-slug>`, the same shape as the webhook's `api.url`) and passes
+  as `api_url` when they lack a webhook URL; the error message quotes it. `"v1"`
+  (**deprecated, will be removed**) is the legacy backoffice-GraphQL gateway: no
+  extendable slug, so `sales` sits directly under the base
+  (`<base_url>/<app_id>/sales`), the default `base_url` (`DEFAULT_BASE_URL`) is
+  the backoffice-GraphQL gateway, and `gateway_key` is required. An app-endpoint
+  `api_url` on `"v1"` also routes through the slug and, when set, supersedes
+  `base_url` entirely (the slug choice is `use_registry_slug = bool(api_url)`).
+  All other behaviour (JWT auth, headers, retries, resource services) is
+  unchanged.
 
 ### 1b. `create_access_service_for_install` — the install factory
 `access_service_factory.py`
@@ -155,8 +171,10 @@ access service for its platform. `InstallAccessTarget` is a `runtime_checkable`
 `Protocol` (`platform`, `api_url`, `install_id` properties) so any record shaped
 like the webhook qualifies. `InstallAccessConfig` is the per-app credential/option
 set (everything in `PeekAccessServiceConfig` except the per-install
-`install_id`/`api_url` and the deprecated URL controls); the factory splats it
-into `PeekAccessServiceConfig` for `"peek"`, and drops the Peek-only
+`install_id`/`api_url`, the deprecated URL controls, and `mode`); the factory
+splats it into `PeekAccessServiceConfig` for `"peek"` **injecting the required
+`mode="v2"`** (a persisted install with an `api_url` is always the registry
+connection), and drops the Peek-only
 `gateway_key`/`item_options_page_size` before building a `BaseAccessServiceConfig`
 for `"cng"`/`"acme"`. An unknown or `None` platform raises `ValueError`. The
 return type is the `InstallAccessService` union alias.
@@ -224,7 +242,16 @@ verification are the deliberate exception). `AdminAccountRequiredError` and
 `RateLimitError` are shared by all platforms and carry a `status_code` class
 attribute; `PeekGraphQLError`/`PeekHttpError` are Peek-only; `CngApiError` /
 `CngPermissionError` CNG-only; `AcmeApiError` ACME-only; `PiiAccessDisabledError`
-carries the blocked `operation` (snake_case method name). The status constants
+carries the blocked `operation` (snake_case method name). The seatmap errors
+`UnknownSeatmapDisplayTypeError` (`.type`), `UnknownSeatmapBlockStatusError`
+(`.status`), `UnknownSeatmapAssignmentParentError` (`.typename`), and
+`SeatmapDeleteError` (the API message) live here too (§4 seatmaps).
+`InstallWebhookError` is the one dual-parent error: it subclasses **both**
+PyJWT's `jwt.InvalidTokenError` and `AppUtilitiesError`, so a receiver's
+`except jwt.InvalidTokenError` → 401 covers it unchanged; `.reason` is an
+`InstallWebhookErrorReason` `Literal` (`"install_id_mismatch"` /
+`"missing_subject"` / `"invalid_api_url"`), with the three reason constants
+(`INSTALL_WEBHOOK_*`) and their messages kept beside it. The status constants
 (`FORBIDDEN_STATUS`, `ADMIN_ACCOUNT_REQUIRED_STATUS`, `RATE_LIMIT_STATUS`) live
 here too so the transports import them rather than restating the numbers.
 
@@ -253,14 +280,123 @@ Each resource follows the same **three-file triad**:
 | `*_converter.py` | Pure, I/O-free functions mapping raw nodes → clean dataclass models. Easy to unit-test. |
 | `*_service.py` | Public `async` class holding the business logic; calls the shared client, then runs the converter. |
 
-Resources: `products`, `account_users`, `resource_pools`, `timeslots`,
-`resellers`, `promo_codes`, `pricing`, `daily_notes`, `availability`,
-`memberships`, `bookings`, `reviews`, plus the webhook-only `waivers` and
-`installs`. Clean data shapes are split by brand: Peek models in `models/peek/`,
-CNG models in `models/cng/`, ACME models in `models/acme/`. Two small resources
-(`availability`, `promo_codes`) fold their converter functions into the
-`*_queries.py` module rather than a separate file; the purity rule still
-applies to them.
+Resources: `products`, `custom_questions`, `account_users`, `resource_pools`,
+`timeslots`, `resellers`, `promo_codes`, `pricing`, `daily_notes`,
+`availability`, `memberships`, `bookings`, `reviews`, `seatmaps`, plus the
+webhook-only `waivers` and `installs`. Clean data shapes are split by brand:
+Peek models in `models/peek/`, CNG models in `models/cng/`, ACME models in
+`models/acme/`. One small resource (`promo_codes`) folds its converter functions
+into the `*_queries.py` module rather than a separate file; the purity rule
+still applies to it.
+
+Seating maps are their own resource triad under `internal/peek/seatmaps/` —
+`seatmap_queries.py` (query/mutation strings, builders, and raw `TypedDict`
+nodes, internal), the pure `seatmap_converter.py`, and `SeatmapService`
+(`get_seatmap_service()`). `get_seatmap_for_product(product_id)` returns every
+`Seatmap` configured on an activity (`list[Seatmap]`, empty when the activity is
+missing or has none; `_seating_maps` lifts `data.activity.seatingMaps`); it is
+unaffected by `full_customer_access` (seating maps are structural layout, not
+customer data). A map carries `zones` (pricing tiers, each with a nullable
+`color_hex` and mapping to `list[SeatmapTicket]`) and a tree of `SeatmapSection`
+→ `SeatmapGroup` (tables) → `SeatmapBlock` (seats). All three rendered levels
+share one `SeatmapDisplay` geometry dataclass: only `x`/`y` are always present,
+and every other field (`width`/`height`/`label`/`type` on sections;
+`table`/`table_width`/`table_height` on groups) collapses to `None` where the
+API does not select it. `SeatmapDisplay.type` is narrowed to
+`SeatmapDisplayType` (`Literal["SHAPE", "SECTION", "LABEL"]`, with the
+`SEATMAP_DISPLAY_TYPES` tuple beside it); a non-`None` value outside that set
+makes the converter raise the exported `UnknownSeatmapDisplayTypeError` rather
+than silently widen the model. Every `product_id` is checked non-blank up front
+(`ERROR_PRODUCT_ID_REQUIRED`, `ValueError`).
+
+`get_seatmap_ids_for_product(product_id)` is the lightweight sibling of
+`get_seatmap_for_product`: a trimmed query (`SEATMAP_IDS_QUERY`) selecting only
+each map's `id`/`name` (no zones/sections/groups/blocks), mapped by the pure
+`from_seatmap_summary_nodes` to `list[SeatmapSummary]` (empty when the activity
+is missing or has none). Same validation and non-PII posture as the full read;
+use it when a caller only needs to list the maps assigned to a product.
+
+`get_seat_map_assignments(product_id, range_start, range_end)` reads a product's
+maps through the same `activity(id).seatingMaps` entry as the plain read (the
+API has no top-level `seatingMap(id)`), with every seat enriched by its
+occupancy over a datetime range, returning `list[AssignedSeatmap]` (empty when
+the activity is missing or has no maps). The query
+(`build_seatmap_assignments_query(full_customer_access)`) selects the same
+structural fields as the plain read plus each seat's
+`availability(datetimeRange)`. The assignment-enriched tree is modeled with
+`AssignedSeatmapBlock(SeatmapBlock)` — a dataclass subclass adding `status`
+(`SeatmapBlockStatus`) and `assigned_to` (`list[SeatmapAssignment]`) — and
+three parallel dataclasses `AssignedSeatmapGroup` / `AssignedSeatmapSection` /
+`AssignedSeatmap` that mirror their base types with the narrowed child
+collection (Python dataclasses cannot override a field's type on inheritance,
+so the containers are restated rather than subclassed; keep their field lists
+in step with the base types). An occupant's kind (`SeatmapOccupantType`) is
+derived from the assignment parent's `__typename` (`Ticket`→`GUEST`,
+`AccountUser`→`ACCOUNT_USER`, `FieldLocation`→`FIELD_LOCATION`; `BlockedSeat` is
+not an occupant and drops out — the `PARENT_*` constants in the queries module
+and `SEATMAP_ASSIGNMENT_PARENTS`); an unknown status or parent raises
+`UnknownSeatmapBlockStatusError` / `UnknownSeatmapAssignmentParentError`.
+`range_start`/`range_end` are normalized in the service
+(`_normalize_naive_datetime`) to the API's naive `YYYY-MM-DDTHH:MM:SS` form
+(seconds added when omitted, timezone and fractional seconds stripped,
+components range-checked) and sent as a half-open `[start, end)` range literal;
+the two bounds must fall on the same date (`ERROR_RANGE_SAME_DATE`,
+`ValueError`). A guest's name is **customer PII**: `SeatmapService` takes the
+`ResolvedAccessOptions` (threaded from `PeekAccessService` like
+`BookingService`/`ReviewService`) and the query builder omits the
+`primaryGuest { firstName lastName }` selection (`_primary_guest_selection`)
+when it is off, so a GUEST occupant's `guest_name` is `None`; staff
+(`AccountUser`) names are not gated. The plain `get_seatmap_for_product` read is
+unaffected — it returns the base `SeatmapBlock` without `status`/`assigned_to`.
+
+`assignable_bookings(product_id, range_start, range_end)` reads the confirmed
+bookings on a product that overlap a range (via `bookings(filter: {
+activityIds, overlapsRange, reservationStatuses: [CONFIRMED] })`,
+`build_assignable_bookings_query(full_customer_access)`), returning
+`list[AssignableBooking]` — each with `assignable_tickets` (`AssignableTicket`,
+keyed by the ticket `hashid` as `assignable_id`) and, per ticket, the seat it
+currently holds (`CurrentSeatAssignment`, `None` when unassigned — the
+assignable case). Range bounds are parsed and validated by the same shared
+`_build_naive_range` helper as `get_seat_map_assignments` (normalize both
+bounds, enforce same date, emit the half-open `[start, end)` literal) and
+booking `starts_at`/`ends_at` have fractional seconds stripped. `notes` carries
+the operator-facing booking notes (`operatorNotes`, empty string when none —
+always selected, not PII-gated). `guest_name` is the same PII-gated
+primary-guest name. The query and converter live in the seatmaps triad alongside
+the seatmap-read code and reuse its `_strip_fractional_seconds` /
+`_join_guest_name` helpers; the models (`AssignableBooking`, `AssignableTicket`,
+`CurrentSeatAssignment`) are named to avoid colliding with the existing
+`Booking`/`Ticket` models.
+
+`assign_tickets_to_seats(assignments)` is the one seatmap **write**: it batches
+one aliased `assignBlocks` call per `SeatmapBlockAssignment` into a single
+mutation (the queries module builds the aliases, variable declarations, and
+variables — `build_assign_blocks_mutation(count)`, `assign_blocks_variables`;
+`assign_blocks_alias` keeps the service/converter in sync). The service
+validates up front — non-empty sequence, each `assignable_id` prefixed `t_`
+(`ASSIGNABLE_ID_PREFIX`), each `block_id` prefixed `csb_` (`BLOCK_ID_PREFIX`) —
+raising `ValueError` before any network call. The converter
+(`to_assignment_response`) classifies each aliased result: a `__typename` of
+`AssignmentResponse` (`ASSIGNMENT_SUCCESS_TYPENAME`) is a success, every other
+union member (the `AssignBlocksError*` types, or a missing result) is a
+per-assignment failure, yielding `"SUCCESS"`/`"FAILED"`/`"PARTIAL"`
+(`AssignmentStatus` + `ASSIGNMENT_STATUSES`). Successes are returned as
+`SuccessfulAssignment` pairs — the requested `assignable_id` (read back from
+the result's `parent.Ticket.hashid`, falling back to the input) and the created
+`assignment_id` (the `asa_…` from `assignments[].id`); failures list the
+`assignable_id`. Per-assignment errors are reported in the `AssignmentResponse`,
+not raised — only transport/GraphQL-level failures raise (via the shared
+client).
+
+`delete_seat_assignments(assignment_ids)` is the companion write: a single
+`deleteAssignments(assignmentIds: [ID!]!)` mutation (`DELETE_ASSIGNMENTS_MUTATION`).
+The service validates up front — non-empty sequence, each id prefixed `asa_`
+(`ASSIGNMENT_ID_PREFIX`) — then inspects the union result: a
+`DeleteAssignmentsSuccess` (`DELETE_ASSIGNMENTS_SUCCESS_TYPENAME`) maps (via
+`from_deleted_assignments`) to the returned `list[DeletedSeatAssignment]` (the
+now-deleted assignments, for reloading state), while any other member (e.g.
+`AssignBlocksErrorInvalidBlockCount`) raises the exported `SeatmapDeleteError`
+carrying the API `message`.
 
 `ProductService` exposes three top-level product filters in addition to the
 combined `get_all_products()`:
@@ -269,21 +405,32 @@ combined `get_all_products()`:
 - `get_all_rentals()` — the same connection filtered to `RENTAL_PRODUCT_TYPE`.
 - `get_all_addons()` — fetches only the `itemOptions` connection, paginated.
 
-It also carries a second, single-activity read: `get_custom_questions(product_id)`
-returns an activity's operator-configured custom questions as a
-`list[CustomQuestion]` (each with `options: list[CustomQuestionOption]` for
-choice-style questions). This is a distinct sub-domain triad living beside the
-products triad — `custom_question_queries.py` (the `activity(id)` →
-`questionActivityConfigurations` query and raw nodes, internal) and the pure
-`custom_question_converter.py` (`from_question_configurations`) — with the
-service method on `ProductService`. The query resolves the choice options via an
-inline `... on ChoiceQuestion` fragment; the converter maps `question.text` →
-`question_text`, `hint` → `hint_text`, `answerDefaultValue` → `default_value`,
-and lifts `order`/`is_required` from the configuration node. These are
-**question definitions, not customer answers**, so they carry no PII and are
-unaffected by `full_customer_access`. The method raises `ValueError` on a blank
-`product_id` before any network call and returns `[]` for an unknown activity.
-`CustomQuestion`/`CustomQuestionOption` are exported from `__init__.py`.
+Custom questions are their own resource triad under
+`internal/peek/custom_questions/` — `custom_question_queries.py` (query strings
+and raw nodes, internal), the pure `custom_question_converter.py`, and
+`CustomQuestionService`. Both reads map to the shared `list[CustomQuestion]`
+model (each with `options: list[CustomQuestionOption]` for choice-style
+questions), via the `... on ChoiceQuestion` inline fragment; the converter maps
+`question.text` → `question_text`, `hint` → `hint_text`, and
+`answerDefaultValue` → `default_value` (one private `_from_question_node` does
+the mapping for both entry points):
+
+- `CustomQuestionService.get_all()` reads the **account-wide** `questions`
+  catalog across all activities (`ALL_CUSTOM_QUESTIONS_QUERY`). The catalog
+  carries no per-activity configuration, so `order` is `0` and `is_required` is
+  `False` on every entry; the converter entry point is `from_question_nodes`.
+  Obtain the service via `PeekAccessService.get_custom_question_service()`.
+- `ProductService.get_custom_questions(product_id)` reuses the same
+  queries/converter module for the **single-activity** read (the `activity(id)`
+  → `questionActivityConfigurations` query, `CUSTOM_QUESTIONS_QUERY`), lifting
+  `order`/`is_required` from the configuration node via
+  `from_question_configurations`. It raises `ValueError` on a blank `product_id`
+  before any network call and returns `[]` for an unknown activity.
+
+These are **question definitions, not customer answers**, so they carry no PII
+and are unaffected by `full_customer_access`. `CustomQuestion` /
+`CustomQuestionOption` and `CustomQuestionService` are exported from
+`__init__.py`.
 
 `ProductService` also surfaces each activity's `currency` on the clean
 `Product` (empty string for add-ons, which have none) — the field pricing
@@ -335,6 +482,21 @@ and raises `ValueError`; a non-success union member on the other mutations also
 raises `ValueError` carrying Peek's message. The consumer-facing guide is
 `docs/external/pricing-api.md` — **keep it in sync** whenever this surface
 changes.
+
+`availability` is a full triad (`internal/peek/availability/`, model
+`models/peek/availability_time.py`): `AvailabilityService.get_availability_times`
+reads `availabilityTimes` and `availability_converter.py` (`to_availability_time`)
+maps each raw node to an `AvailabilityTime`. Each slot carries a per-ticket
+`price` (`Money | None`, via the converter's `_to_money`). `Money`
+(`models/peek/money.py`, `amount`/`currency`/`formatted`, all `str`) is the
+shared, public clean-money dataclass reused across resources (booking add-ons'
+`BookingAddon.total` via `addon_converter._to_addon_money`, availability prices);
+it is distinct from the pricing domain's `PricingMoney` (which renames
+`formatted` → optional `display_price`). The internal `to_pricing_money` helper
+(`internal/peek/money.py`) and `PricingMoney` are unaffected. The TypeScript
+package keeps `BookingAddonMoney` as a `@deprecated` alias of `Money`; this port
+does not (see `CONVENTIONS.md`), and `AvailabilityTime` here never carried the
+`minimumTicketsRequired` field TypeScript added in 1.0.1 and removed in 1.2.0.
 
 `waivers` is a **webhook-only resource**: it has no GraphQL reads (so no
 queries/service/converter triad), just `internal/peek/waivers/waiver_webhook.py`
@@ -470,17 +632,34 @@ test flag, timezone, or `api_url` that live in the JSON body.
 
 Three design rules hold this together and are load-bearing:
 
-- **The JSON body is the source of the event data; the JWT authenticates it and
-  is the fallback.** Every field is read from the body first: `account_name`,
-  `platform`, `is_test`, `timezone`, `api_url` are body-only, and `install_id`,
-  `account_id`, `status`, `display_version`, `user` (from `modified_by`) fall
-  back to the verified token when the body omits them. The real install token
-  does not actually carry those five, so reading it first returned empty core
-  fields — the body is where the data lives. The signature still authenticates
-  the whole delivery (only Peek can mint a valid token), so the body is trusted
-  within a verified request. `user` resolution is defensive on the body path (a
-  `modified_by` without a real `id` is treated as absent) but keeps the strict
-  `map_peek_token_user` `id` check on the token path.
+- **`install_id` comes only from the token `sub`.** The body `install_id` never
+  sets it; it is only compared. A non-empty body `install_id` that is not equal
+  to `sub` raises `InstallWebhookError(reason="install_id_mismatch")`, and a
+  verified token with no usable `sub` (absent, non-string, blank, or `"null"` —
+  the shared `clean_token_string` sentinel rule) raises it with
+  `reason="missing_subject"`. The check lives in `_resolve_install_id` in
+  `install_webhook.py`; the converter stays pure.
+- **A delivered `api_url` must be a Peek-owned domain.** When the body carries a
+  non-empty `api.url`, its host must be `peek.com` (production) or
+  `peeklabs.com` (sandbox), or a subdomain of either, or `parse_install_webhook`
+  raises `InstallWebhookError(reason="invalid_api_url")` — a spoofed webhook must
+  not be able to point the app's API calls at a foreign gateway. An absent
+  `api_url` is not validated. The check (`_assert_allowed_api_url`, with the
+  allow-list in the module-level `ALLOWED_API_URL_DOMAINS` and the host parsed
+  by `urllib.parse.urlsplit`) lives in `install_webhook.py`; a scheme-less value
+  is parsed as `https`, the suffix match is case-insensitive and
+  label-anchored (`peek.com.evil.com` does not match), and the converter stays
+  pure.
+- **The JSON body is the source of the other event data; the JWT authenticates
+  it and is the fallback.** `account_name`, `platform`, `is_test`, `timezone`,
+  `api_url` are body-only, and `account_id`, `status`, `display_version`, `user`
+  (from `modified_by`) fall back to the verified token when the body omits them.
+  The install token does not reliably carry those four, so reading it first
+  returned empty core fields — the body is where the data lives. The token does
+  carry `sub`, and the registry sets the body `install_id` to the same value, so
+  a real delivery passes the install-id check. `user` resolution is defensive on
+  the body path (a `modified_by` without a real `id` is treated as absent) but
+  keeps the strict `map_peek_token_user` `id` check on the token path.
 - **`InstallWebhook` is flat and JSON-safe.** The shape the parser returns is the
   shape a consumer persists and later rehydrates (`dataclasses.asdict` round
   trips it), so there is exactly one representation of "who this install is and
@@ -549,7 +728,30 @@ Recurring patterns inside services:
 - **Multi-step mutations** — booking creation (`createQuoteV2` →
   `createOrderFromQuote`) and both add-on mutations (`createQuoteFromOrder` →
   `updateQuoteV2` → `amendOrder`) are orchestrated as ordered request chains
-  with per-step error checks. When `CreateBookingInput.list_price` is set, the
+  with per-step error checks. When `CreateBookingInput.parent_order_id` is set,
+  `create` instead takes the **amendment path** (`_create_via_amend`):
+  `createQuoteFromOrder` seeds a quote bound to that order
+  (`_create_quote_from_order_or_raise`, shared with the add-on flows),
+  `updateQuoteV2` adds the new booking to it in the **sparse** input shape (same
+  field names as the strict quote but with `reservationStatus: "CONFIRMED"`
+  stamped explicitly at the booking and ticket level, since sparse drops those
+  defaults), and `amendOrder` applies it (`_amend_order_or_raise`) —
+  `createOrderFromQuote` is never called because it always mints a *new* order.
+  The amended order holds every pre-existing booking plus the new one, so
+  `create` locates the new booking by the client-generated `refid` it carried
+  through the quote (the expanded `amendOrder` selection reads back `sales { …
+  on Booking { id displayId refid balance } }`, matched on `BOOKING_TYPENAME`),
+  never by list position; a missing refid match is a hard error
+  (`ERROR_AMEND_NO_MATCHING_BOOKING`). `mark_as_paid` then charges that
+  booking's own balance, not the order total. `parent_order_id` is
+  format-checked by `assert_order_id` in `_validate_create_input`. When
+  `CreateBookingInput.promo_code` is a non-empty string (trimmed via
+  `_resolve_promo_code`), `create` attaches it to the `createQuoteV2`
+  `quoteInput` as `promoCodes: [{ code, refid, isEnabled: true }]` with a fresh
+  `refid`; it is rejected up front (`ERROR_PROMO_CODE_WITH_PARENT_ORDER`,
+  `ValueError`) when combined with `parent_order_id` — the amendment path
+  creates no quote — so the code is never silently dropped. When
+  `CreateBookingInput.list_price` is set, the
   pure `bookings/list_price.py` (`distribute_list_price`, `Decimal`-based)
   splits that total across the expanded ticket seats in integer cents —
   `floor(total / n)` for the first n-1, the remainder to the last — and `create`
@@ -608,8 +810,9 @@ it is an object rather than a bare boolean so future cross-cutting flags slot in
 without changing any downstream signatures. `PeekAccessService` resolves it once
 (`resolve_access_options`, which fills defaults into a `ResolvedAccessOptions`)
 and threads the resolved value into the resource services that read customer
-data (`BookingService` via `BookingServiceOptions`, `ReviewService` directly).
-CNG/ACME accept the field but have no PII surface, so it is inert there.
+data (`BookingService` via `BookingServiceOptions`, `ReviewService` and
+`SeatmapService` directly). CNG/ACME accept the field but have no PII surface,
+so it is inert there.
 
 When `full_customer_access` is `False` (the default), two things happen:
 
@@ -632,6 +835,14 @@ When `full_customer_access` is `False` (the default), two things happen:
      `notes`/`waiverSigned` always stay.
    - **Reviews** (`build_reviews_query`): drops the reviewer `name`/`email`; the
      review `comment`, rating, dates, and credited guides always stay.
+   - **Seatmaps** (`build_seatmap_assignments_query` /
+     `build_assignable_bookings_query` in `seatmap_queries.py`): drop the
+     booking `primaryGuest { firstName lastName }` selection, so a GUEST
+     occupant's / assignable booking's `guest_name` is `None`. The layout, seat
+     `status`, booking/ticket ids and names, `starts_at`/`ends_at`, operator
+     `notes`, and staff (`AccountUser`) names always stay; the plain
+     `get_seatmap_for_product` / `get_seatmap_ids_for_product` reads select no
+     customer data at all.
    - **Waivers** (`parse_waiver_webhook`): the webhook delivers a *fixed*
      payload with no selection to trim, so this is the one place filtering is
      applied at parse time — the participant `guest_name` becomes `None` and the
@@ -667,13 +878,25 @@ service class (and the options/result types callers need:
 `PromoCodeServiceOptions`, `AddAddonInput`, `CancelBookingResult`), all
 data-model dataclasses and `Literal` aliases (including `PeekAuthTokenClaims`,
 `PeekAuthTokenUser`, `PeekPlatform`/`PEEK_PLATFORMS`, `InstallWebhook`,
-`InstallStatus`/`INSTALL_STATUSES`, `Waiver`, and the product-type constants),
-the `Logger` protocol + `noop_logger` + `logging_adapter`, the three webhook
-parsers (`parse_booking_webhook`, `parse_waiver_webhook`,
-`parse_install_webhook`), and the typed error classes (`AppUtilitiesError`,
-`AdminAccountRequiredError`, `RateLimitError`, `PeekGraphQLError`,
-`PeekHttpError`, `PiiAccessDisabledError`, `CngApiError`, `CngPermissionError`,
-`AcmeApiError`). Query strings, raw `TypedDict`s, the transports, and the
+`InstallStatus`/`INSTALL_STATUSES`, `Waiver`, the shared `Money`, the
+`CustomQuestion` models, the seatmap models — `Seatmap`/`SeatmapZone`/
+`SeatmapTicket`/`SeatmapSection`/`SeatmapGroup`/`SeatmapBlock`/`SeatmapDisplay`,
+`SeatmapSummary`, the `Assigned*` tree + `SeatmapAssignment`,
+`AssignableBooking`/`AssignableTicket`/`CurrentSeatAssignment`,
+`SeatmapBlockAssignment`/`AssignmentResponse`/`SuccessfulAssignment`,
+`DeletedSeatAssignment`, with the `SeatmapDisplayType`/`SeatmapBlockStatus`/
+`SeatmapOccupantType`/`AssignmentStatus` aliases and their `SEATMAP_*` /
+`ASSIGNMENT_STATUSES` tuples — and the product-type constants), the `Logger`
+protocol + `noop_logger` + `logging_adapter`, the three webhook parsers
+(`parse_booking_webhook`, `parse_waiver_webhook`, `parse_install_webhook`), and
+the typed error classes (`AppUtilitiesError`, `AdminAccountRequiredError`,
+`RateLimitError`, `PeekGraphQLError`, `PeekHttpError`, `PiiAccessDisabledError`,
+`UnknownSeatmapDisplayTypeError`, `UnknownSeatmapBlockStatusError`,
+`UnknownSeatmapAssignmentParentError`, `SeatmapDeleteError`,
+`InstallWebhookError` (subclasses PyJWT's `jwt.InvalidTokenError`; + its
+`InstallWebhookErrorReason` alias), `CngApiError`, `CngPermissionError`,
+`AcmeApiError`). `V2_FALLBACK_URL_PREFIX` / `DEFAULT_BASE_URL` stay on
+`peek_access_service.py` (not in the barrel). Query strings, raw `TypedDict`s, the transports, and the
 internal detail models are deliberately kept internal — including the
 booking-webhook registration query (`BOOKING_WEBHOOK_GQL_QUERY` stays internal,
 documented via `docs/webhooks.md`). `__all__` is the authoritative list.
@@ -815,7 +1038,22 @@ install the TypeScript package for the browser side.
 - **Developer harness:** `scripts/gql_cli/cli.py` drives the real resource
   services against the live API (outside `src/`, never packaged; CI checks it
   compiles with `python -m py_compile`). Its `REGISTRY` must be kept in sync
-  with the public service surface (see `CLAUDE.md`).
+  with the public service surface (see `CLAUDE.md`) — it carries a
+  `custom-questions` and a `seatmaps` group alongside the older ones, and mirrors
+  `PeekAccessService`'s URL model (`PEEK_API_URL` set → the registry-slug route
+  that `mode="v2"` uses; unset → the legacy v1 `base_url/app_id` route with
+  `PEEK_GATEWAY_KEY`).
+- **Generated HTML changelog:** `docs/html/changelog.html` is rendered from
+  `changelog.md` by `scripts/build-changelog-html.mjs` — a Node script vendored
+  from the TypeScript package (branding aside, unchanged) so both ports render
+  the same Markdown subset into the same page shell as `docs/html/*.html`
+  (left-nav of versions, filter, light/dark toggle, `[breaking]`/`[fix]`/
+  `[additive]`/`[deprecated]` badges). `changelog.md` is the single source of
+  truth; the HTML is never hand-edited. `tests/test_changelog_html.py` is the
+  drift guard: it runs the script with `--check` (skipped when `node` is not on
+  `PATH`) and fails when the committed HTML differs from a fresh render, so
+  `pytest` catches a stale file. The page is linked from `docs/index.html`
+  under its own "Changelog" card.
 - **CI:** `.github/workflows/ci.yml` runs on every push to `main` and every pull
   request, across the three Python versions: `uv sync --group dev` → `ruff check`
   + `ruff format --check` → `mypy` → `pytest --cov` (coverage gate) → harness
