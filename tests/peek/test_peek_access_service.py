@@ -110,16 +110,35 @@ def test_raises_when_a_required_v1_field_is_missing(field: str):
         PeekAccessService(config(**{field: ""}))
 
 
-def test_does_not_require_gateway_key_in_v2_mode():
+def test_requires_api_url_in_v2_mode():
+    with pytest.raises(ValueError, match=r'mode "v2" requires an "api_url"'):
+        PeekAccessService(
+            PeekAccessServiceConfig(
+                install_id="install-1",
+                jwt_secret="secret",
+                issuer="Peek Test",
+                app_id="app-1",
+                mode="v2",
+            )
+        )
+
+
+def test_needs_neither_app_id_nor_gateway_key_in_v2_mode_when_api_url_is_set():
     PeekAccessService(
         PeekAccessServiceConfig(
             install_id="install-1",
             jwt_secret="secret",
             issuer="Peek Test",
-            app_id="app-1",
             mode="v2",
+            api_url="https://apps.peek.com/installations-api/demo-app",
         )
     )
+
+
+@pytest.mark.parametrize("mode", [None, "", "v3"])
+def test_raises_when_mode_is_missing_or_invalid(mode: object):
+    with pytest.raises(ValueError, match=r'"mode" is required'):
+        PeekAccessService(config(mode=mode))
 
 
 # ─── accessors ───────────────────────────────────────────────────────────────
@@ -323,7 +342,10 @@ async def test_v2_still_mints_and_sends_a_bearer_token():
     client, calls = empty_products_client()
     peek = PeekAccessService(
         config(
-            mode="v2", api_url="https://apps.peek.com/installations-api/app-1", http_client=client
+            mode="v2",
+            api_url="https://apps.peek.com/installations-api/app-1",
+            gateway_key=None,
+            http_client=client,
         )
     )
     await peek.get_product_service().get_all_products()
@@ -339,6 +361,7 @@ def api_url_config(api_url: str, **overrides: Any) -> PeekAccessServiceConfig:
         install_id="install-1",
         jwt_secret="secret",
         issuer="Peek Test",
+        mode="v2",
         api_url=api_url,
         **overrides,
     )
@@ -363,11 +386,11 @@ def test_api_url_needs_neither_app_id_nor_gateway_key():
     PeekAccessService(api_url_config(API_URL))
 
 
-async def test_api_url_takes_precedence_over_base_url_and_mode():
+async def test_api_url_takes_precedence_over_base_url_in_v1_mode_too():
     client, calls = empty_products_client()
     peek = PeekAccessService(
         config(
-            mode="v2", base_url="https://ignored.example/gql", api_url=API_URL, http_client=client
+            mode="v1", base_url="https://ignored.example/gql", api_url=API_URL, http_client=client
         )
     )
     await peek.get_product_service().get_all_products()

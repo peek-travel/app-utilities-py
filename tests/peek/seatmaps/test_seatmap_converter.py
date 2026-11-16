@@ -14,6 +14,7 @@ from peek_app_utilities.errors import (
 from peek_app_utilities.internal.peek.seatmaps.seatmap_converter import (
     from_assignable_bookings,
     from_assigned_seatmap,
+    from_assigned_seatmap_nodes,
     from_deleted_assignments,
     from_seatmap_nodes,
     from_seatmap_summary_nodes,
@@ -120,6 +121,11 @@ def display(**overrides: Any) -> SeatmapDisplay:
     return SeatmapDisplay(**{**base, **overrides})
 
 
+def nodes(*items: dict[str, Any]) -> list[Any]:
+    """Raw node literals as the converters' input (loosely typed on purpose)."""
+    return list(items)
+
+
 def section_node(id: str, type: str, groups: list[dict[str, Any]] | None = None) -> dict[str, Any]:
     node: dict[str, Any] = {"id": id, "display": {"x": 0, "y": 0, "type": type}}
     if groups is not None:
@@ -131,7 +137,7 @@ def section_node(id: str, type: str, groups: list[dict[str, Any]] | None = None)
 
 
 def test_maps_a_seating_map_node_into_the_clean_model():
-    [seatmap] = from_seatmap_nodes([full_node()])
+    [seatmap] = from_seatmap_nodes(nodes(full_node()))
 
     assert (seatmap.id, seatmap.name) == ("csm_8j734", "Dinner Theater")
     assert seatmap.zones == [
@@ -146,25 +152,23 @@ def test_maps_a_seating_map_node_into_the_clean_model():
 
 
 def test_fills_a_sections_shared_display_and_leaves_table_fields_none():
-    [seatmap] = from_seatmap_nodes([full_node()])
+    [seatmap] = from_seatmap_nodes(nodes(full_node()))
     shape = seatmap.sections[0]
 
     # Fields a section never carries collapse to None.
-    assert shape.display == display(
-        x=672, y=366, width=200, height=60, label="Stage", type="SHAPE"
-    )
+    assert shape.display == display(x=672, y=366, width=200, height=60, label="Stage", type="SHAPE")
     assert shape.groups == []
 
 
 def test_fills_a_section_display_with_none_width_height_label():
-    [seatmap] = from_seatmap_nodes([full_node()])
+    [seatmap] = from_seatmap_nodes(nodes(full_node()))
     section = seatmap.sections[1]
 
     assert section.display == display(x=800, y=432, type="SECTION")
 
 
 def test_fills_a_group_display_with_table_fields_and_nones_section_only_fields():
-    [seatmap] = from_seatmap_nodes([full_node()])
+    [seatmap] = from_seatmap_nodes(nodes(full_node()))
     group = seatmap.sections[1].groups[0]
 
     assert (group.id, group.name, group.assignable_to) == ("csg_yj9ge", "Table 12", ["GUEST"])
@@ -173,7 +177,7 @@ def test_fills_a_group_display_with_table_fields_and_nones_section_only_fields()
 
 
 def test_maps_a_block_keeping_only_x_y_on_its_display_and_resolving_zone_id():
-    [seatmap] = from_seatmap_nodes([full_node()])
+    [seatmap] = from_seatmap_nodes(nodes(full_node()))
     block = seatmap.sections[1].groups[0].blocks[0]
 
     assert block == SeatmapBlock(
@@ -196,7 +200,7 @@ def test_accepts_every_known_display_type():
             section_node("c", "LABEL", []),
         ],
     }
-    [seatmap] = from_seatmap_nodes([node])
+    [seatmap] = from_seatmap_nodes(nodes(node))
     assert [s.display.type for s in seatmap.sections] == ["SHAPE", "SECTION", "LABEL"]
 
 
@@ -204,7 +208,7 @@ def test_raises_unknown_seatmap_display_type_error_on_an_unrecognized_type():
     node = {"id": "m", "name": "m", "sections": [section_node("a", "CIRCLE", [])]}
 
     with pytest.raises(UnknownSeatmapDisplayTypeError) as info:
-        from_seatmap_nodes([node])
+        from_seatmap_nodes(nodes(node))
     assert info.value.type == "CIRCLE"
 
 
@@ -234,7 +238,7 @@ def test_treats_a_none_group_table_height_as_none_irregular_table():
             )
         ],
     }
-    [seatmap] = from_seatmap_nodes([node])
+    [seatmap] = from_seatmap_nodes(nodes(node))
     assert seatmap.sections[0].groups[0].display.table_height is None
 
 
@@ -265,12 +269,12 @@ def test_defaults_a_blocks_missing_zone_to_a_none_zone_id():
             )
         ],
     }
-    [seatmap] = from_seatmap_nodes([node])
+    [seatmap] = from_seatmap_nodes(nodes(node))
     assert seatmap.sections[0].groups[0].blocks[0].zone_id is None
 
 
 def test_defaults_missing_optional_collections_to_empty_lists():
-    [seatmap] = from_seatmap_nodes([{"id": "m", "name": "m"}])
+    [seatmap] = from_seatmap_nodes(nodes({"id": "m", "name": "m"}))
 
     assert seatmap.zones == []
     assert seatmap.sections == []
@@ -285,7 +289,7 @@ def test_defaults_missing_group_collections_and_assignable_to():
             section_node("a", "SECTION", [{"name": "g", "id": "g", "display": {"x": 0, "y": 0}}])
         ],
     }
-    [seatmap] = from_seatmap_nodes([node])
+    [seatmap] = from_seatmap_nodes(nodes(node))
 
     assert seatmap.zones[0].tickets == []
     assert seatmap.zones[0].color_hex is None
@@ -553,17 +557,19 @@ def test_assigned_defaults_missing_optional_collections_to_empty():
 
 
 def test_assigned_defaults_missing_groups_blocks_collections_to_empty():
-    seatmap = from_assigned_seatmap(
-        {
-            "id": "m",
-            "name": "m",
-            "sections": [
-                section_node("s1", "SECTION"),
-                section_node(
-                    "s2", "SECTION", [{"id": "g1", "name": "g1", "display": {"x": 0, "y": 0}}]
-                ),
-            ],
-        }
+    [seatmap] = from_assigned_seatmap_nodes(
+        nodes(
+            {
+                "id": "m",
+                "name": "m",
+                "sections": [
+                    section_node("s1", "SECTION"),
+                    section_node(
+                        "s2", "SECTION", [{"id": "g1", "name": "g1", "display": {"x": 0, "y": 0}}]
+                    ),
+                ],
+            }
+        )
     )
     assert seatmap.sections[0].groups == []
     assert seatmap.sections[1].groups[0].blocks == []
@@ -610,7 +616,7 @@ ASSIGNABLE_BOOKING: dict[str, Any] = {
 
 
 def test_maps_a_booking_with_an_assigned_ticket():
-    [booking] = from_assignable_bookings([ASSIGNABLE_BOOKING])
+    [booking] = from_assignable_bookings(nodes(ASSIGNABLE_BOOKING))
     assert booking == AssignableBooking(
         id="bk_1",
         display_id="ABC123",
@@ -633,21 +639,26 @@ def test_maps_a_booking_with_an_assigned_ticket():
 
 def test_nones_currently_assigned_to_when_a_ticket_has_no_seating_assignment():
     [booking] = from_assignable_bookings(
-        [
+        nodes(
             {
                 **ASSIGNABLE_BOOKING,
                 "tickets": [
                     {"hashid": "tkt_h2", "resourceOptionSnapshot": {"id": "ro-2", "name": "Child"}}
                 ],
             }
-        ]
+        )
     )
     assert booking.assignable_tickets[0].currently_assigned_to is None
 
 
 def test_nones_ticket_snapshot_fields_and_block_fields_when_absent():
     [booking] = from_assignable_bookings(
-        [{**ASSIGNABLE_BOOKING, "tickets": [{"hashid": "tkt_h3", "seatingAssignment": {"id": "asa_3"}}]}]
+        nodes(
+            {
+                **ASSIGNABLE_BOOKING,
+                "tickets": [{"hashid": "tkt_h3", "seatingAssignment": {"id": "asa_3"}}],
+            }
+        )
     )
     assert booking.assignable_tickets[0] == AssignableTicket(
         assignable_id="tkt_h3",
@@ -660,12 +671,12 @@ def test_nones_ticket_snapshot_fields_and_block_fields_when_absent():
 
 
 def test_assignable_nones_guest_name_when_primary_guest_is_absent_pii_off():
-    [booking] = from_assignable_bookings([{**ASSIGNABLE_BOOKING, "primaryGuest": None}])
+    [booking] = from_assignable_bookings(nodes({**ASSIGNABLE_BOOKING, "primaryGuest": None}))
     assert booking.guest_name is None
 
 
 def test_defaults_missing_tickets_times_and_notes_to_empty_none():
-    [booking] = from_assignable_bookings([{"id": "bk_2", "displayId": "X"}])
+    [booking] = from_assignable_bookings(nodes({"id": "bk_2", "displayId": "X"}))
     assert booking.assignable_tickets == []
     assert booking.starts_at is None
     assert booking.ends_at is None

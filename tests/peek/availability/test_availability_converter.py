@@ -35,11 +35,11 @@ def test_maps_every_field_one_to_one():
 
 
 def test_maps_a_missing_price_to_none_and_missing_availability_to_an_empty_list():
-    result = to_availability_time({**NODE, "price": None, "availability": None})
+    result = to_availability_time({**NODE, "price": None, "availability": None})  # type: ignore[typeddict-item]
     assert result.price is None
     assert result.availability == []
 
 
 def test_degrades_a_sparse_price_node_to_empty_strings():
-    result = to_availability_time({**NODE, "price": {"amount": None}})
+    result = to_availability_time({**NODE, "price": {"amount": None}})  # type: ignore[typeddict-item]
     assert result.price == Money(amount="", currency="", formatted="")
