@@ -33,6 +33,7 @@ const ALLOWED = new Set([
   "Optional", "Iterable", "Callable", "TypedDict", "Awaitable", "Coroutine",
   // stdlib modules/classes that are written with their module prefix
   "AsyncClient", // httpx.AsyncClient
+  "InvalidTokenError", // jwt.InvalidTokenError (PyJWT)
 ]);
 
 const PASCAL_RE = /\b[A-Z][a-z][A-Za-z0-9]*\b/g;

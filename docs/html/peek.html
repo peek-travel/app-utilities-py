@@ -303,9 +303,9 @@ render({
   {
    name:"PeekAccessService",
    file:"src/peek_app_utilities/peek_access_service.py",
-   desc:"The public entry point. Construct one per install with a <code>PeekAccessServiceConfig</code>. Validates the config and hands out the per-resource service classes through its <code>get_…_service()</code> accessors (lazily created and memoized), all bound to one shared authenticated client (a <code>GraphQLClient</code>) that mints and caches a short-lived JWT on demand. Supports <code>async with</code>, which closes the package-owned HTTP client on exit.",
+   desc:"The public entry point. Construct one per install with a <code>PeekAccessServiceConfig</code>. Validates the config and hands out the per-resource service classes through its <code>get_…_service()</code> accessors (lazily created and memoized), all bound to one shared authenticated client (a <code>GraphQLClient</code>) that mints and caches a short-lived JWT on demand. Supports <code>async with</code>, which closes the package-owned HTTP client on exit. The constructor raises <code>ValueError</code> when <code>mode</code> is not <code>\"v1\"</code>/<code>\"v2\"</code>, when <code>\"v2\"</code> is chosen without an <code>api_url</code>, when a required field is empty (<code>install_id</code>, <code>jwt_secret</code>, <code>issuer</code>; in <code>\"v1\"</code> mode without an <code>api_url</code> also <code>app_id</code> and <code>gateway_key</code>), or when <code>api_url</code> carries another platform's slug.",
    ctor:"PeekAccessService(config: PeekAccessServiceConfig)",
-   example:"import os\nfrom peek_app_utilities import PeekAccessService, PeekAccessServiceConfig\n\nasync with PeekAccessService(PeekAccessServiceConfig(\n    install_id=\"install_123\",  # from verify_peek_auth_token(token).install_id\n    jwt_secret=os.environ[\"APP_SECRET\"],\n    issuer=\"my-app\",\n    api_url=\"https://apps.peek.com/installations-api/my-app\",  # from the install webhook\n)) as peek:\n    # every product (activities + add-ons) as one flat list\n    products = await peek.get_product_service().get_all_products()",
+   example:"import os\nfrom peek_app_utilities import PeekAccessService, PeekAccessServiceConfig\n\nasync with PeekAccessService(PeekAccessServiceConfig(\n    install_id=\"install_123\",  # from verify_peek_auth_token(token).install_id\n    jwt_secret=os.environ[\"APP_SECRET\"],\n    issuer=\"my-app\",\n    mode=\"v2\",  # required connection generation; \"v2\" = registry\n    api_url=\"https://apps.peek.com/installations-api/my-app\",  # from the install webhook\n)) as peek:\n    # every product (activities + add-ons) as one flat list\n    products = await peek.get_product_service().get_all_products()",
    methods:[
      {name:"get_product_service",sig:"def get_product_service(self) -&gt; ProductService",desc:"Product service (lazily created + memoized)."},
      {name:"get_account_user_service",sig:"def get_account_user_service(self) -&gt; AccountUserService",desc:"Account-user service."},
@@ -319,6 +319,8 @@ render({
      {name:"get_membership_service",sig:"def get_membership_service(self) -&gt; MembershipService",desc:"Membership service."},
      {name:"get_booking_service",sig:"def get_booking_service(self, integrator: str | None = None) -&gt; BookingService",desc:"Booking service (composed with the product service; receives the resolved access options). Instances are memoized per <code>integrator</code>.",notes:"<code>integrator</code> scopes <code>get_meta_data</code> results and the <code>set_meta_data_…</code> writes; it defaults to the config's <code>issuer</code>. <b>Do not set it</b> unless Peek engineering created a custom integrator id for this integration."},
      {name:"get_review_service",sig:"def get_review_service(self) -&gt; ReviewService",desc:"Review service (receives the resolved access options)."},
+     {name:"get_custom_question_service",sig:"def get_custom_question_service(self) -&gt; CustomQuestionService",desc:"Custom-question service (the account-wide question catalog)."},
+     {name:"get_seatmap_service",sig:"def get_seatmap_service(self) -&gt; SeatmapService",desc:"Seating-map service (receives the resolved access options)."},
      {name:"verify_peek_auth_token",sig:"def verify_peek_auth_token(self, token: str) -&gt; PeekAuthTokenClaims",desc:"Verifies an app-registry JWT (HMAC signature with this service's <code>jwt_secret</code>, expiry, <code>app_registry_v2</code> issuer, <code>Joken</code> audience) and returns the decoded claims. Accepts a raw <code>x-peek-auth</code> header value (a leading <code>Bearer </code> is stripped). Synchronous — no network.",notes:"Raises PyJWT's <code>jwt.ExpiredSignatureError</code> / <code>jwt.ImmatureSignatureError</code> / <code>jwt.InvalidTokenError</code> (the base class — also covers a bad signature, wrong issuer/audience, malformed token) on verification failure; claim extraction never raises (absent <code>user</code> → <code>None</code>, sentinel user fields <code>\"\"</code>/<code>\"null\"</code> → <code>None</code>)."},
      {name:"aclose",sig:"async def aclose(self) -&gt; None",desc:"Closes the package-owned HTTP client. A caller-supplied <code>http_client</code> is left open.",notes:"Called automatically on <code>async with</code> exit."},
      {name:"__aenter__ / __aexit__",sig:"async with PeekAccessService(config) as peek: …",desc:"Async context-manager support: enters with the service itself and calls <code>aclose()</code> on exit."}
@@ -335,6 +337,34 @@ render({
      {name:"get_all_rentals",sig:"async def get_all_rentals(self) -&gt; list[Product]",desc:"Products with type <code>RENTAL</code>.",notes:"Filters the activities to <code>RENTAL_PRODUCT_TYPE</code>."},
      {name:"get_all_addons",sig:"async def get_all_addons(self) -&gt; list[Product]",desc:"Only add-on products.",notes:"Paginated."},
      {name:"get_custom_questions",sig:"async def get_custom_questions(self, product_id: str) -&gt; list[CustomQuestion]",desc:"Every custom question configured on one activity, in Peek's order.",notes:"Raises <code>ValueError</code> (\"A non-empty product id is required.\") on a blank id before any network call; returns <code>[]</code> for an unknown activity. Definitions only — no PII, unaffected by <code>full_customer_access</code>."}
+   ]
+  },
+  {
+   name:"CustomQuestionService",
+   file:"src/peek_app_utilities/internal/peek/custom_questions/custom_question_service.py",
+   desc:"Account-wide custom-question reads — the catalog of question definitions across all activities. For the questions configured on one activity (with their order and requiredness) use <code>ProductService.get_custom_questions</code>.",
+   obtain:"PeekAccessService.get_custom_question_service()",
+   methods:[
+     {name:"get_all",sig:"async def get_all(self) -&gt; list[CustomQuestion]",desc:"Every custom question defined on the account, across all activities; <code>[]</code> when none exist.",notes:"Choice-style questions (<code>SELECT_ONE</code>, <code>LOCATION</code>, …) carry their <code>options</code>; free-text/checkbox questions return an empty option list. The account-wide catalog carries no per-activity configuration, so <code>order</code> is <code>0</code> and <code>is_required</code> is <code>False</code> on every entry. Definitions only — no PII, unaffected by <code>full_customer_access</code>."}
+   ]
+  },
+  {
+   name:"SeatmapService",
+   file:"src/peek_app_utilities/internal/peek/seatmaps/seatmap_service.py",
+   desc:"Seating-map operations: the maps configured on a product, seat occupancy and assignable bookings over a datetime range, and assigning tickets to seats / deleting assignments. Receives the resolved access options (guest-name PII on/off) from the access service.",
+   obtain:"PeekAccessService.get_seatmap_service()",
+   notes:[
+     "<b>Datetime ranges:</b> <code>range_start</code>/<code>range_end</code> are flexible — seconds optional (<code>…T14:00</code>); a trailing timezone (<code>Z</code> / <code>±HH:MM</code>) or fractional seconds is stripped — and are normalized to a naive <code>YYYY-MM-DDTHH:MM:SS</code>. The range is half-open (inclusive <code>range_start</code>, exclusive <code>range_end</code>) and both bounds must fall on the <b>same date</b>. A blank, unparseable or out-of-range bound, or bounds on different dates, raise <code>ValueError</code> before any network call.",
+     "<b>Id prefixes:</b> an <code>assignable_id</code> (bookable-ticket handle) must start with <code>t_</code>, a <code>block_id</code> (seat) with <code>csb_</code>, and an <code>assignment_id</code> (seating-assignment record) with <code>asa_</code> — checked before any network call, raising <code>ValueError</code>.",
+     "<b>PII:</b> a booking's primary-guest name is customer PII. When <code>full_customer_access</code> is off, <code>guest_name</code> on an <code>AssignableBooking</code> and on a GUEST <code>SeatmapAssignment</code> is always <code>None</code> (it is never requested); staff (ACCOUNT_USER) names are not gated. The layout reads carry no customer data and are unaffected."
+   ],
+   methods:[
+     {name:"get_seatmap_for_product",sig:"async def get_seatmap_for_product(self, product_id: str) -&gt; list[Seatmap]",desc:"Every seating map configured on an activity, in Peek's order (a product may have zero, one, or many).",notes:"Raises <code>ValueError</code> (\"A non-empty product id is required.\") on a blank id before any network call; returns <code>[]</code> when the activity is missing or has no maps. A section <code>display.type</code> outside <code>SEATMAP_DISPLAY_TYPES</code> raises <code>UnknownSeatmapDisplayTypeError</code>. Structural layout, not customer data — unaffected by <code>full_customer_access</code>."},
+     {name:"get_seatmap_ids_for_product",sig:"async def get_seatmap_ids_for_product(self, product_id: str) -&gt; list[SeatmapSummary]",desc:"The id and name of every seating map on an activity — a lightweight list without the zone/section/seat layout.",notes:"Simplified counterpart of <code>get_seatmap_for_product</code>. Raises <code>ValueError</code> (\"A non-empty product id is required.\") on a blank id before any network call; returns <code>[]</code> when the activity is missing or has no maps. Structural, not customer data — unaffected by <code>full_customer_access</code>."},
+     {name:"get_seat_map_assignments",sig:"async def get_seat_map_assignments(self, product_id: str, range_start: str, range_end: str) -&gt; list[AssignedSeatmap]",desc:"Every seating map on an activity with each seat enriched by its occupancy (<code>status</code> + <code>assigned_to</code>) over a datetime range; <code>[]</code> when the activity is missing or has no maps.",notes:"<code>range_start</code>/<code>range_end</code> follow the shared range rules above (normalized to naive <code>YYYY-MM-DDTHH:MM:SS</code>, half-open, same date). Raises <code>ValueError</code> on a blank <code>product_id</code> or an invalid range before any network call; <code>UnknownSeatmapDisplayTypeError</code> / <code>UnknownSeatmapBlockStatusError</code> / <code>UnknownSeatmapAssignmentParentError</code> when Peek returns an unrecognized section type, seat status, or assignment parent. <b>PII:</b> a GUEST occupant's <code>guest_name</code> is <code>None</code> when <code>full_customer_access</code> is off; staff (ACCOUNT_USER) names are not gated."},
+     {name:"assignable_bookings",sig:"async def assignable_bookings(self, product_id: str, range_start: str, range_end: str) -&gt; list[AssignableBooking]",desc:"Confirmed bookings on an activity overlapping a datetime range, each with the tickets that can be assigned to seats (and the seat a ticket currently holds); <code>[]</code> when none match.",notes:"<code>range_start</code>/<code>range_end</code> follow the same parsing/validation as <code>get_seat_map_assignments</code> (seconds optional, timezone/fractional stripped, same date) and are queried half-open. Raises <code>ValueError</code> on a blank <code>product_id</code> or an invalid range before any network call. Booking <code>starts_at</code>/<code>ends_at</code> have fractional seconds stripped. <b>PII:</b> <code>guest_name</code> is <code>None</code> when <code>full_customer_access</code> is off."},
+     {name:"assign_tickets_to_seats",sig:"async def assign_tickets_to_seats(self, assignments: Sequence[SeatmapBlockAssignment]) -&gt; AssignmentResponse",desc:"Bulk-assigns bookable tickets to seats in one request and reports per-assignment outcomes: <code>status</code> <code>SUCCESS</code>/<code>PARTIAL</code>/<code>FAILED</code>, the successes as <code>SuccessfulAssignment</code> pairs (the new <code>asa_…</code> record for each <code>assignable_id</code>), and the failed <code>assignable_id</code>s.",notes:"Raises <code>ValueError</code> when <code>assignments</code> is empty, or when any <code>assignable_id</code> does not start with <code>t_</code> or any <code>block_id</code> with <code>csb_</code> — all before any network call. Per-assignment failures (overbooking, invalid type, …) are reported in <code>failed_assignments</code>, <b>not</b> raised; only request-level failures raise the package's usual typed errors."},
+     {name:"delete_seat_assignments",sig:"async def delete_seat_assignments(self, assignment_ids: Sequence[str]) -&gt; list[DeletedSeatAssignment]",desc:"Deletes seat assignments by id and returns the now-deleted assignments (seat id/name + freed ticket handle) so callers can reload state without a refetch.",notes:"Raises <code>ValueError</code> when <code>assignment_ids</code> is empty or any id does not start with <code>asa_</code> — before any network call. A batch-level failure reported by Peek raises <code>SeatmapDeleteError</code> (Peek's explanation is the message); request-level failures raise the usual typed errors."}
    ]
   },
   {
@@ -465,7 +495,7 @@ render({
      {name:"list_addons",sig:"async def list_addons(self, booking_id: str) -&gt; BookingAddons",desc:"Add-ons on a booking, grouped by add-on item.",notes:"Validates the booking id; raises <code>ValueError</code> when the booking is not found or multiple bookings match."},
      {name:"add_addon",pii:true,sig:"async def add_addon(self, booking_id: str, addon: AddAddonInput) -&gt; BookingAddonsMutationResult",desc:"Adds an add-on (create quote from order → update quote → amend order).",notes:"<code>quantity</code> must be a positive-integer string; <code>addon_option_id</code> is required. Resolves the parent item via the product service (concurrently with the booking's add-on read); reuses a non-canceled add-on's item refid. Raises <code>ValueError</code> on a missing option id, invalid quantity, add-on not found, or any mutation failure."},
      {name:"remove_addon",pii:true,sig:"async def remove_addon(self, booking_id: str, addon: AddAddonInput) -&gt; BookingAddonsMutationResult",desc:"Removes (cancels) add-on options.",notes:"Same three mutations with cancellation variables; cancels up to <code>quantity</code> confirmed options; marks the parent canceled only when all its options are canceled. Raises <code>ValueError</code> when no matching confirmed option is found."},
-     {name:"create",sig:"async def create(self, booking: CreateBookingInput) -&gt; CreatedBooking",desc:"Creates a booking (create quote → create order from quote), optionally marking it paid.",notes:"Validates: <code>activity_id</code>, <code>availability_time_id</code>, ≥1 ticket with <code>resource_option_id</code> + positive quantity, guest <code>name</code>; <code>idempotency_key</code> required when <code>mark_as_paid</code>; <code>parent_order_id</code> (if set) must be a valid order id. Resolves + validates custom-question answers (and a malformed <code>list_price</code>) before creating anything. Raises <code>ValueError</code> on validation or quote/order failures."}
+     {name:"create",sig:"async def create(self, booking: CreateBookingInput) -&gt; CreatedBooking",desc:"Creates a booking, optionally attaching it to an existing order and/or marking it paid.",notes:"Validates: <code>activity_id</code>, <code>availability_time_id</code>, ≥1 ticket with <code>resource_option_id</code> + positive quantity, guest <code>name</code>; <code>idempotency_key</code> required when <code>mark_as_paid</code>; <code>parent_order_id</code> (if set) must be a valid order id; <code>promo_code</code> cannot be combined with <code>parent_order_id</code>. Resolves + validates custom-question answers (and a malformed <code>list_price</code>) before creating anything. A non-empty <code>promo_code</code> (trimmed) is applied to the new booking's quote as an enabled promo code — Peek validates and prices it. When <code>parent_order_id</code> is set the booking is added to that existing order (the returned <code>order_id</code> matches it, and <code>mark_as_paid</code> charges the new booking's own balance); otherwise it is created in its own new order. Raises <code>ValueError</code> on validation or creation failures."}
    ]
   },
   {
@@ -528,12 +558,12 @@ render({
   {name:"TimeslotFilter",kind:"type",file:"src/peek_app_utilities/models/peek/timeslot.py",
    desc:"Timeslot filter for <code>TimeslotService.get_for_day</code>.",def:'Literal["all", "withBookings", "withoutBookings"]'},
   {name:"GatewayMode",kind:"type",file:"src/peek_app_utilities/access_service_config.py",
-   desc:"The only explicit gateway mode <code>PeekAccessServiceConfig.mode</code> accepts (legacy v2 routing). Leave <code>mode</code> unset and pass <code>api_url</code> instead. Import from <code>peek_app_utilities.access_service_config</code>.",def:'Literal["v2"]'},
+   desc:"The connection generation <code>PeekAccessServiceConfig.mode</code> requires. <code>\"v2\"</code> is the app-registry connection (needs the install's <code>api_url</code>); <code>\"v1\"</code> is the deprecated legacy connection. Import from <code>peek_app_utilities.access_service_config</code>.",def:'Literal["v1", "v2"]'},
   {name:"PeekAccessServiceConfig",kind:"config",file:"src/peek_app_utilities/peek_access_service.py",extends:"BaseAccessServiceConfig",
    desc:"Constructor config for <code>PeekAccessService</code> — a frozen, keyword-only dataclass. Adds the Peek-only fields below; all other fields are inherited.",
    fields:[
-    {name:"gateway_key",type:"str | None",n:"opt",desc:"API gateway key for the legacy v1 route. Required in the legacy v1 mode (no <code>api_url</code>, no <code>mode=\"v2\"</code>); not used otherwise."},
-    {name:"mode",type:"GatewayMode | None",n:"opt",desc:"Gateway mode. <code>\"v2\"</code> routes through the app-registry installations API; <code>None</code> (default) is the legacy v1 backoffice route. <code>api_url</code>, when set, supersedes this."},
+    {name:"mode",type:"GatewayMode",n:false,desc:"<b>Required</b> connection generation — choose explicitly (previously optional with a <code>\"v1\"</code> default; the constructor now raises <code>ValueError</code> when it is missing or not <code>\"v1\"</code>/<code>\"v2\"</code>). <code>\"v2\"</code> (<b>use going forward</b>) is the app-registry connection: it <b>requires</b> the install webhook's <code>api_url</code> (raises without it) and needs no <code>gateway_key</code>. Without a webhook <code>api_url</code>, build one by appending your <b>app slug</b> to the registry prefix — <code>https://apps.peek.com/installations-api/&lt;app-slug&gt;</code> (the trailing app-slug segment is required; the prefix alone is not a valid URL) — as a transitional bridge. <code>\"v1\"</code> (<b>deprecated, will be removed</b>) is the legacy connection and needs <code>app_id</code> + <code>gateway_key</code> unless an <code>api_url</code> is supplied; it is the fastest update for installs that relied on the old default. <code>create_access_service_for_install</code> supplies <code>\"v2\"</code> for you."},
+    {name:"gateway_key",type:"str | None",n:"opt",desc:"API gateway key for the legacy <code>\"v1\"</code> connection. Required in <code>\"v1\"</code> mode unless an <code>api_url</code> is supplied; not used in <code>\"v2\"</code>."},
     {name:"item_options_page_size",type:"int | None",n:"opt",desc:"Page size for cursor-paginated item options. Default 50."}
    ]},
   {name:"BaseAccessServiceConfig",kind:"config",file:"src/peek_app_utilities/access_service_config.py",
@@ -542,7 +572,7 @@ render({
     {name:"install_id",type:"str",n:false,desc:"Install ID. Becomes the JWT subject. Required."},
     {name:"jwt_secret",type:"str",n:false,desc:"HMAC secret used to sign the JWT. Required."},
     {name:"issuer",type:"str",n:false,desc:"JWT issuer — the app name / app ID. Required."},
-    {name:"api_url",type:"str | None",n:"opt",desc:"The install's <b>base API URL</b> (persist the install webhook's <code>api_url</code>). Each service class appends its own backoffice slug (e.g. <code>peek_backoffice_api-v1</code>) when it calls, so different platforms route through different slugs. If the URL you pass already carries this platform's slug (dashes or underscores) it is stripped back to the base; a URL carrying a different platform's slug makes the constructor raise <code>ValueError</code>. No app-id segment is inserted (so <code>app_id</code> is not required). Preferred over <code>base_url</code>/<code>app_id</code>."},
+    {name:"api_url",type:"str | None",n:"opt",desc:"The install's <b>base API URL</b> (persist the install webhook's <code>api_url</code>). Each service class appends its own backoffice slug (e.g. <code>peek_backoffice_api-v1</code>) when it calls, so different platforms route through different slugs. If the URL you pass already carries this platform's slug (dashes or underscores) it is stripped back to the base; a URL carrying a different platform's slug makes the constructor raise <code>ValueError</code>. No app-id segment is inserted (so <code>app_id</code> is not required). Preferred over <code>base_url</code>/<code>app_id</code>. For <code>PeekAccessService</code> with <code>mode=\"v2\"</code> this field is <b>required</b> (the constructor raises without it); without a webhook <code>api_url</code>, append your app slug to the registry prefix — <code>https://apps.peek.com/installations-api/&lt;app-slug&gt;</code> — as a transitional bridge."},
     {name:"app_id",type:"str | None",n:"opt",desc:"<b>Deprecated.</b> App ID appended to <code>base_url</code>. Required only in legacy <code>base_url</code> mode."},
     {name:"base_url",type:"str | None",n:"opt",desc:"<b>Deprecated.</b> Override the base URL (per-service default). Prefer <code>api_url</code>."},
     {name:"token_ttl_seconds",type:"int | None",n:"opt",desc:"JWT lifetime in seconds. Default 3600."},
@@ -578,11 +608,163 @@ render({
     {name:"min_price",type:"PricingMoney | None",n:true,desc:"Lowest price across the range; <code>None</code> for add-ons / when none."},
     {name:"max_price",type:"PricingMoney | None",n:true,desc:"Highest price across the range; <code>None</code> for add-ons / when none."}
    ]},
-  {name:"CustomQuestion",kind:"dataclass",file:"src/peek_app_utilities/models/peek/custom_question.py",desc:"A custom question configured on an activity (definition, no PII).",
+  {name:"Seatmap",kind:"dataclass",file:"src/peek_app_utilities/models/peek/seatmap.py",desc:"A complete seating map configured on a product: <code>zones</code> (pricing tiers) plus a tree of <code>sections</code> → <code>SeatmapGroup</code> (tables) → <code>SeatmapBlock</code> (seats). Returned by <code>SeatmapService.get_seatmap_for_product</code>.",
+   fields:[
+    {name:"id",type:"str",n:false,desc:"Seating-map id (e.g. <code>csm_8j734</code>)."},
+    {name:"name",type:"str",n:false,desc:"Display name."},
+    {name:"zones",type:"list[SeatmapZone]",n:false,desc:"Pricing tiers on the map."},
+    {name:"sections",type:"list[SeatmapSection]",n:false,desc:"Top-level sections, shapes, and labels."}
+   ]},
+  {name:"SeatmapSummary",kind:"dataclass",file:"src/peek_app_utilities/models/peek/seatmap.py",desc:"A lightweight seating-map summary (id + name only, no zone/section/seat layout), returned by <code>SeatmapService.get_seatmap_ids_for_product</code>.",
+   fields:[
+    {name:"id",type:"str",n:false,desc:"Seating-map id (e.g. <code>csm_8j734</code>)."},
+    {name:"name",type:"str",n:false,desc:"Display name."}
+   ]},
+  {name:"SeatmapZone",kind:"dataclass",file:"src/peek_app_utilities/models/peek/seatmap.py",desc:"A pricing tier; each seat belongs to a zone (via <code>SeatmapBlock.zone_id</code>) and a zone maps to the tickets its seats sell as.",
+   fields:[
+    {name:"id",type:"str",n:false,desc:"Zone id (e.g. <code>csz_z77an</code>)."},
+    {name:"name",type:"str",n:false,desc:"Zone name (e.g. <code>Premium</code>)."},
+    {name:"color_hex",type:"str | None",n:true,desc:"Zone display color as a hex string (e.g. <code>#ff0000</code>), or <code>None</code> when Peek reports none."},
+    {name:"tickets",type:"list[SeatmapTicket]",n:false,desc:"Tickets (resource options) this zone sells seats as."}
+   ]},
+  {name:"SeatmapTicket",kind:"dataclass",file:"src/peek_app_utilities/models/peek/seatmap.py",desc:"A bookable ticket a zone sells seats as.",
+   fields:[
+    {name:"id",type:"str",n:false,desc:"Ticket / resource-option id (the same <code>resource_option_id</code> used when booking)."},
+    {name:"name",type:"str",n:false,desc:"Ticket name (e.g. <code>Adult - Premium</code>)."}
+   ]},
+  {name:"SeatmapSection",kind:"dataclass",file:"src/peek_app_utilities/models/peek/seatmap.py",desc:"A top-level region of the map: a seatable section, a shape, or a label.",
+   fields:[
+    {name:"id",type:"str",n:false,desc:"Section id (e.g. <code>css_km8d5</code>)."},
+    {name:"display",type:"SeatmapDisplay",n:false,desc:"Geometry; sections populate <code>label</code>/<code>width</code>/<code>height</code>/<code>type</code>."},
+    {name:"groups",type:"list[SeatmapGroup]",n:false,desc:"Groups (tables); empty for shapes and labels."}
+   ]},
+  {name:"SeatmapGroup",kind:"dataclass",file:"src/peek_app_utilities/models/peek/seatmap.py",desc:"A group of seats — typically one table.",
+   fields:[
+    {name:"id",type:"str",n:false,desc:"Group id (e.g. <code>csg_yj9ge</code>)."},
+    {name:"name",type:"str",n:false,desc:"Group name (e.g. <code>Table 12</code>)."},
+    {name:"assignable_to",type:"list[str]",n:false,desc:"Audience(s) seats can be assigned to (e.g. <code>[\"GUEST\"]</code>); Peek-owned raw strings."},
+    {name:"blocks",type:"list[SeatmapBlock]",n:false,desc:"The seats in this group."},
+    {name:"display",type:"SeatmapDisplay",n:false,desc:"Geometry; groups populate <code>table</code>/<code>table_width</code>/<code>table_height</code>."}
+   ]},
+  {name:"SeatmapBlock",kind:"dataclass",file:"src/peek_app_utilities/models/peek/seatmap.py",desc:"A single seat within a group (table).",
+   fields:[
+    {name:"id",type:"str",n:false,desc:"Block (seat) id (e.g. <code>csb_a7bk8</code>)."},
+    {name:"name",type:"str",n:false,desc:"Short seat name within its table (e.g. <code>1</code>, <code>O-2</code>)."},
+    {name:"full_block_name",type:"str",n:false,desc:"Fully qualified seat name (e.g. <code>Table 12, Seat 1</code>)."},
+    {name:"order",type:"int",n:false,desc:"Zero-based position within its table."},
+    {name:"zone_id",type:"str | None",n:true,desc:"Owning zone id, or <code>None</code> when the seat is unassigned to any zone."},
+    {name:"display",type:"SeatmapDisplay",n:false,desc:"Geometry; blocks populate only <code>x</code>/<code>y</code>."}
+   ]},
+  {name:"SeatmapDisplay",kind:"dataclass",file:"src/peek_app_utilities/models/peek/seatmap.py",desc:"Display geometry shared by sections, groups, and blocks. Only <code>x</code>/<code>y</code> are always present; every other field is <code>None</code> where the element does not carry it.",
+   fields:[
+    {name:"x",type:"float",n:false,desc:"X coordinate, in map units."},
+    {name:"y",type:"float",n:false,desc:"Y coordinate, in map units."},
+    {name:"width",type:"float | None",n:true,desc:"Width (sections only), else <code>None</code>."},
+    {name:"height",type:"float | None",n:true,desc:"Height (sections only), else <code>None</code>."},
+    {name:"table_width",type:"float | None",n:true,desc:"Table width (groups only), else <code>None</code>."},
+    {name:"table_height",type:"float | None",n:true,desc:"Table height (groups only), else <code>None</code> (also <code>None</code> for an irregular table)."},
+    {name:"table",type:"bool | None",n:true,desc:"Whether the group draws as a table (groups only), else <code>None</code>."},
+    {name:"label",type:"str | None",n:true,desc:"Free-text label (sections only), else <code>None</code>."},
+    {name:"type",type:"SeatmapDisplayType | None",n:true,desc:"Section kind (sections only), else <code>None</code>; a non-<code>None</code> value is always one of <code>SEATMAP_DISPLAY_TYPES</code>."}
+   ]},
+  {name:"SeatmapDisplayType",kind:"type",file:"src/peek_app_utilities/models/peek/seatmap.py",
+   desc:"Section kind on <code>SeatmapDisplay.type</code>: <code>SECTION</code> (seatable, holds groups), <code>SHAPE</code> (decorative, e.g. a stage), <code>LABEL</code> (free text). Sibling const: <code>SEATMAP_DISPLAY_TYPES</code>; a non-<code>None</code> value outside this set raises <code>UnknownSeatmapDisplayTypeError</code>.",def:'Literal["SHAPE", "SECTION", "LABEL"]'},
+  {name:"AssignedSeatmap",kind:"dataclass",file:"src/peek_app_utilities/models/peek/seatmap.py",desc:"A seating map whose seats carry occupancy for a queried datetime range. Returned by <code>SeatmapService.get_seat_map_assignments</code>. Same fields as <code>Seatmap</code>, with <code>sections</code> narrowed to <code>AssignedSeatmapSection</code> (a separate dataclass, not a subclass of <code>Seatmap</code>).",
+   fields:[
+    {name:"id",type:"str",n:false,desc:"Seating-map id (e.g. <code>csm_8j734</code>)."},
+    {name:"name",type:"str",n:false,desc:"Display name."},
+    {name:"zones",type:"list[SeatmapZone]",n:false,desc:"Pricing tiers on the map."},
+    {name:"sections",type:"list[AssignedSeatmapSection]",n:false,desc:"Sections of the map, enriched with occupancy."}
+   ]},
+  {name:"AssignedSeatmapSection",kind:"dataclass",file:"src/peek_app_utilities/models/peek/seatmap.py",desc:"A section whose groups carry assignment data. Same fields as <code>SeatmapSection</code>, with <code>groups</code> narrowed to <code>AssignedSeatmapGroup</code> (a separate dataclass, not a subclass).",
+   fields:[
+    {name:"id",type:"str",n:false,desc:"Section id (e.g. <code>css_km8d5</code>)."},
+    {name:"display",type:"SeatmapDisplay",n:false,desc:"Geometry; sections populate <code>label</code>/<code>width</code>/<code>height</code>/<code>type</code>."},
+    {name:"groups",type:"list[AssignedSeatmapGroup]",n:false,desc:"Groups (tables), enriched with occupancy."}
+   ]},
+  {name:"AssignedSeatmapGroup",kind:"dataclass",file:"src/peek_app_utilities/models/peek/seatmap.py",desc:"A group whose seats carry assignment data. Same fields as <code>SeatmapGroup</code>, with <code>blocks</code> narrowed to <code>AssignedSeatmapBlock</code> (a separate dataclass, not a subclass).",
+   fields:[
+    {name:"id",type:"str",n:false,desc:"Group id (e.g. <code>csg_yj9ge</code>)."},
+    {name:"name",type:"str",n:false,desc:"Group name (e.g. <code>Table 12</code>)."},
+    {name:"assignable_to",type:"list[str]",n:false,desc:"Audience(s) seats can be assigned to (e.g. <code>[\"GUEST\"]</code>)."},
+    {name:"blocks",type:"list[AssignedSeatmapBlock]",n:false,desc:"Seats in this group, enriched with occupancy."},
+    {name:"display",type:"SeatmapDisplay",n:false,desc:"Geometry; groups populate <code>table</code>/<code>table_width</code>/<code>table_height</code>."}
+   ]},
+  {name:"AssignedSeatmapBlock",kind:"dataclass",file:"src/peek_app_utilities/models/peek/seatmap.py",extends:"SeatmapBlock",desc:"A seat enriched with its occupancy over a queried range — a subclass of <code>SeatmapBlock</code> adding the two fields below. The plain <code>get_seatmap_for_product</code> read returns the base <code>SeatmapBlock</code> without them.",
+   fields:[
+    {name:"status",type:"SeatmapBlockStatus",n:false,desc:"Occupancy status for the queried range."},
+    {name:"assigned_to",type:"list[SeatmapAssignment]",n:false,desc:"Occupants across the range; empty unless <code>status</code> is <code>OCCUPIED</code>."}
+   ]},
+  {name:"SeatmapAssignment",kind:"dataclass",file:"src/peek_app_utilities/models/peek/seatmap.py",desc:"A single occupant of a seat for the queried range. A seat can carry more than one across a range spanning multiple slots. Booking-derived fields are populated only for a GUEST occupant.",
+   fields:[
+    {name:"occupied_by",type:"SeatmapOccupantType",n:false,desc:"Kind of occupant holding the seat."},
+    {name:"booking_id",type:"str | None",n:true,desc:"Booking id (GUEST only), else <code>None</code>."},
+    {name:"booking_display_id",type:"str | None",n:true,desc:"Human-facing booking display id (GUEST only), else <code>None</code>."},
+    {name:"product_id",type:"str | None",n:true,desc:"Activity id from the booking snapshot (GUEST only), else <code>None</code>."},
+    {name:"product_name",type:"str | None",n:true,desc:"Activity name from the booking snapshot (GUEST only), else <code>None</code>."},
+    {name:"ticket_id",type:"str | None",n:true,desc:"Resource-option id from the snapshot (GUEST only), else <code>None</code>."},
+    {name:"ticket_name",type:"str | None",n:true,desc:"Resource-option name from the snapshot (GUEST only), else <code>None</code>."},
+    {name:"guest_name",type:"str | None",n:true,desc:"Primary guest (GUEST) or staff member (ACCOUNT_USER) name; <code>None</code> for FIELD_LOCATION, and <code>None</code> for a GUEST when <code>full_customer_access</code> is off (customer PII)."},
+    {name:"starts_at",type:"str | None",n:true,desc:"Booking start, naive datetime (GUEST only), else <code>None</code>."},
+    {name:"ends_at",type:"str | None",n:true,desc:"Booking end, naive datetime (GUEST only), else <code>None</code>."}
+   ]},
+  {name:"SeatmapBlockStatus",kind:"type",file:"src/peek_app_utilities/models/peek/seatmap.py",
+   desc:"Seat occupancy status over a queried range. Sibling const: <code>SEATMAP_BLOCK_STATUSES</code>; an unrecognized value raises <code>UnknownSeatmapBlockStatusError</code>.",def:'Literal["AVAILABLE", "OCCUPIED", "BLOCKED"]'},
+  {name:"SeatmapOccupantType",kind:"type",file:"src/peek_app_utilities/models/peek/seatmap.py",
+   desc:"Seat occupant kind, derived from the assignment's parent: a booked ticket → <code>GUEST</code>, a staff member → <code>ACCOUNT_USER</code>, a field location → <code>FIELD_LOCATION</code>. Sibling const: <code>SEATMAP_OCCUPANT_TYPES</code>; an unrecognized parent raises <code>UnknownSeatmapAssignmentParentError</code>.",def:'Literal["GUEST", "ACCOUNT_USER", "FIELD_LOCATION"]'},
+  {name:"AssignableBooking",kind:"dataclass",file:"src/peek_app_utilities/models/peek/seatmap.py",desc:"A confirmed booking overlapping a queried range, with the tickets that can be assigned to seats. Returned by <code>SeatmapService.assignable_bookings</code>.",
+   fields:[
+    {name:"id",type:"str",n:false,desc:"Booking id."},
+    {name:"display_id",type:"str",n:false,desc:"Human-facing booking display id."},
+    {name:"starts_at",type:"str | None",n:true,desc:"Booking start, naive datetime (fractional seconds stripped), or <code>None</code>."},
+    {name:"ends_at",type:"str | None",n:true,desc:"Booking end, naive datetime (fractional seconds stripped), or <code>None</code>."},
+    {name:"notes",type:"str",n:false,desc:"Operator-facing booking notes; empty string when none."},
+    {name:"guest_name",type:"str | None",n:true,desc:"Primary guest name; <code>None</code> when absent or when <code>full_customer_access</code> is off (customer PII)."},
+    {name:"assignable_tickets",type:"list[AssignableTicket]",n:false,desc:"The booking's tickets that can be assigned to seats."}
+   ]},
+  {name:"AssignableTicket",kind:"dataclass",file:"src/peek_app_utilities/models/peek/seatmap.py",desc:"A bookable ticket on an <code>AssignableBooking</code> — the unit assigned to a seat.",
+   fields:[
+    {name:"assignable_id",type:"str",n:false,desc:"The ticket's stable assignment handle (its <code>hashid</code>) — starts with <code>t_</code>."},
+    {name:"ticket_id",type:"str | None",n:true,desc:"Resource-option id from the snapshot, or <code>None</code>."},
+    {name:"ticket_name",type:"str | None",n:true,desc:"Resource-option name from the snapshot, or <code>None</code>."},
+    {name:"currently_assigned_to",type:"CurrentSeatAssignment | None",n:true,desc:"The seat this ticket currently holds, or <code>None</code> when unassigned (the assignable case)."}
+   ]},
+  {name:"CurrentSeatAssignment",kind:"dataclass",file:"src/peek_app_utilities/models/peek/seatmap.py",desc:"The seat a ticket is currently assigned to, when it has one.",
+   fields:[
+    {name:"assignment_id",type:"str",n:false,desc:"The seating-assignment record id — starts with <code>asa_</code>."},
+    {name:"block_id",type:"str | None",n:true,desc:"The assigned seat (block) id, or <code>None</code> when Peek omits the block."},
+    {name:"block_name",type:"str | None",n:true,desc:"The assigned seat's full name (e.g. <code>Table 12, Seat 1</code>), or <code>None</code>."}
+   ]},
+  {name:"SeatmapBlockAssignment",kind:"input",file:"src/peek_app_utilities/models/peek/seatmap.py",desc:"One seat assignment to request — input to <code>SeatmapService.assign_tickets_to_seats</code>.",
+   fields:[
+    {name:"assignable_id",type:"str",n:false,desc:"The ticket handle to assign (must start with <code>t_</code>)."},
+    {name:"block_id",type:"str",n:false,desc:"The seat (block) id to assign it to (must start with <code>csb_</code>)."}
+   ]},
+  {name:"AssignmentResponse",kind:"dataclass",file:"src/peek_app_utilities/models/peek/seatmap.py",desc:"The result of <code>SeatmapService.assign_tickets_to_seats</code>. Only per-assignment failures are reflected here; request-level failures raise.",
+   fields:[
+    {name:"status",type:"AssignmentStatus",n:false,desc:"Overall outcome across all requested assignments."},
+    {name:"successful_assignments",type:"list[SuccessfulAssignment]",n:false,desc:"The tickets assigned successfully, each with its new <code>assignment_id</code>."},
+    {name:"failed_assignments",type:"list[str]",n:false,desc:"The <code>assignable_id</code>s that failed to assign."}
+   ]},
+  {name:"SuccessfulAssignment",kind:"dataclass",file:"src/peek_app_utilities/models/peek/seatmap.py",desc:"A ticket that was successfully assigned to a seat, pairing the requested handle with the created record.",
+   fields:[
+    {name:"assignable_id",type:"str",n:false,desc:"The requested ticket handle (a <code>t_…</code>, from the ticket's <code>hashid</code>)."},
+    {name:"assignment_id",type:"str",n:false,desc:"The created seating-assignment record id (an <code>asa_…</code>)."}
+   ]},
+  {name:"AssignmentStatus",kind:"type",file:"src/peek_app_utilities/models/peek/seatmap.py",
+   desc:"Overall outcome of a bulk assignment: <code>SUCCESS</code> when all succeed, <code>FAILED</code> when all fail, <code>PARTIAL</code> when some of each. Sibling const: <code>ASSIGNMENT_STATUSES</code>.",def:'Literal["SUCCESS", "PARTIAL", "FAILED"]'},
+  {name:"DeletedSeatAssignment",kind:"dataclass",file:"src/peek_app_utilities/models/peek/seatmap.py",desc:"A seat assignment just deleted by <code>SeatmapService.delete_seat_assignments</code> — returned for reloading state without a refetch.",
+   fields:[
+    {name:"assignment_id",type:"str",n:false,desc:"The (now-deleted) seating-assignment record id — starts with <code>asa_</code>."},
+    {name:"block_id",type:"str | None",n:true,desc:"The seat (block) id it occupied, or <code>None</code> when Peek omits the block."},
+    {name:"block_name",type:"str | None",n:true,desc:"The seat's full name (e.g. <code>Table 12, Seat 1</code>), or <code>None</code>."},
+    {name:"ticket_hash_id",type:"str | None",n:true,desc:"The freed ticket's <code>hashid</code> (starts with <code>t_</code>) when the parent is a ticket, else <code>None</code>."}
+   ]},
+  {name:"CustomQuestion",kind:"dataclass",file:"src/peek_app_utilities/models/peek/custom_question.py",desc:"A custom question definition (no PII), whether configured on one activity (<code>ProductService.get_custom_questions</code>) or read from the account-wide catalog (<code>CustomQuestionService.get_all</code>).",
    fields:[
     {name:"id",type:"str",n:false,desc:"Question id (e.g. <code>cq_anq67</code>)."},
-    {name:"order",type:"int",n:false,desc:"1-based position in the activity's question list."},
-    {name:"is_required",type:"bool",n:false,desc:"Whether an answer is required."},
+    {name:"order",type:"int",n:false,desc:"1-based position in the activity's question list; <code>0</code> for the account-wide catalog (no per-activity config)."},
+    {name:"is_required",type:"bool",n:false,desc:"Whether an answer is required; <code>False</code> for the account-wide catalog (no per-activity config)."},
     {name:"question_text",type:"str",n:false,desc:"Prompt shown to the guest (Peek <code>text</code>)."},
     {name:"hint_text",type:"str | None",n:true,desc:"Helper/hint text, or <code>None</code>."},
     {name:"question_type",type:"str",n:false,desc:"Input type (e.g. <code>CHECK_BOX</code>, <code>TEXT</code>, <code>LOCATION</code>, <code>SELECT_ONE</code>)."},
@@ -842,6 +1024,7 @@ render({
     {name:"end",type:"str",n:false,desc:"Slot end (ISO datetime)."},
     {name:"duration",type:"Duration",n:false,desc:"Slot length."},
     {name:"status",type:"str",n:false,desc:"Availability status (open/closed/sold-out)."},
+    {name:"price",type:"Money | None",n:true,desc:"Per-ticket price for the slot, when Peek reports one; else <code>None</code>."},
     {name:"availability",type:"list[Availability]",n:false,desc:"Remaining availability per resource option."}
    ]},
   {name:"Duration",kind:"dataclass",file:"src/peek_app_utilities/models/peek/availability_time.py",desc:"A duration label + numeric length.",
@@ -1151,7 +1334,8 @@ render({
     {name:"require_required_questions",type:"bool | None",n:"opt",desc:"Fail if a required question is unanswered (default <code>False</code>)."},
     {name:"accept_all_custom_question_ids",type:"bool | None",n:"opt",desc:"Accept a <code>cq_…</code> id not in the activity's question list as a plain text answer instead of failing; by-name answers still must match (default <code>False</code>)."},
     {name:"skip_customer_email",type:"bool | None",n:"opt",desc:"Suppress the confirmation email (default <code>False</code>)."},
-    {name:"parent_order_id",type:"str | None",n:"opt",desc:"Clone the quote from an existing order (must be a valid <code>o_…</code>/<code>O-…</code> id)."},
+    {name:"parent_order_id",type:"str | None",n:"opt",desc:"Attach the new booking to an <b>existing</b> order (a valid <code>o_…</code>/<code>O-…</code> id) instead of creating a new one; the returned <code>CreatedBooking.order_id</code> matches it. Omit to create the booking in its own new order."},
+    {name:"promo_code",type:"str | None",n:"opt",desc:"Promo code to apply to the booking's quote. A non-empty string (trimmed) is sent as an enabled promo code — Peek validates and prices it. Empty/whitespace/<code>None</code> means none. Cannot be combined with <code>parent_order_id</code>: <code>create</code> raises <code>ValueError</code>, because attaching to an existing order makes no new quote and the code would be silently dropped."},
     {name:"mark_as_paid",type:"bool | None",n:"opt",desc:"Mark paid after creation (requires <code>idempotency_key</code>)."},
     {name:"mark_as_paid_amount",type:"str | None",n:"opt",desc:"Partial payment amount; defaults to the full balance."},
     {name:"idempotency_key",type:"str | None",n:"opt",desc:"Idempotency key for the mark-paid charge."}
@@ -1232,11 +1416,11 @@ render({
     {name:"order_id",type:"str",n:false,desc:"Order the invoice is for."},
     {name:"invoice_link",type:"str",n:false,desc:"Customer-facing payable URL."}
    ]},
-  {name:"BookingAddonMoney",kind:"dataclass",file:"src/peek_app_utilities/models/peek/booking_addon.py",desc:"A money value on a booking add-on.",
+  {name:"Money",kind:"dataclass",file:"src/peek_app_utilities/models/peek/money.py",desc:"A monetary value returned by Peek, shared across services and resources (booking add-on totals, availability-slot prices, …). <code>amount</code> is deliberately a decimal string, never a number.",
    fields:[
-    {name:"amount",type:"str",n:false,desc:"Numeric amount string."},
-    {name:"currency",type:"str",n:false,desc:"ISO currency code."},
-    {name:"formatted",type:"str",n:false,desc:"Human-formatted amount."}
+    {name:"amount",type:"str",n:false,desc:"Numeric amount as a decimal string (e.g. <code>50.00</code>)."},
+    {name:"currency",type:"str",n:false,desc:"ISO 4217 currency code (e.g. <code>USD</code>)."},
+    {name:"formatted",type:"str",n:false,desc:"Human-formatted amount (e.g. <code>$50.00</code>)."}
    ]},
   {name:"BookingAddonOption",kind:"dataclass",file:"src/peek_app_utilities/models/peek/booking_addon.py",desc:"A live option on a booking add-on.",
    fields:[
@@ -1248,7 +1432,7 @@ render({
    fields:[
     {name:"addon_id",type:"str",n:false,desc:"Add-on item id."},
     {name:"addon_name",type:"str",n:false,desc:"Add-on item name."},
-    {name:"total",type:"BookingAddonMoney | None",n:true,desc:"Line-item total, when present."},
+    {name:"total",type:"Money | None",n:true,desc:"Line-item total, when present."},
     {name:"addon_options",type:"list[BookingAddonOption]",n:false,desc:"Live options combined by option id."}
    ]},
   {name:"BookingAddons",kind:"dataclass",file:"src/peek_app_utilities/models/peek/booking_addon.py",desc:"All add-ons on a booking.",
@@ -1290,14 +1474,29 @@ render({
     {name:"count_four_star",type:"int",n:false,desc:"Number of 4-star reviews."},
     {name:"count_five_star",type:"int",n:false,desc:"Number of 5-star reviews."}
    ]},
-  {name:"AccessOptions",kind:"input",file:"src/peek_app_utilities/access_options.py",desc:"Cross-cutting access options passed once at access-service construction (and accepted directly by <code>parse_waiver_webhook</code>). Governs PII exposure and payment/modification gating. Threaded into <code>BookingService</code> and <code>ReviewService</code>.",
+  {name:"AccessOptions",kind:"input",file:"src/peek_app_utilities/access_options.py",desc:"Cross-cutting access options passed once at access-service construction (and accepted directly by <code>parse_waiver_webhook</code>). Governs PII exposure and payment/modification gating. Threaded into <code>BookingService</code>, <code>ReviewService</code> and <code>SeatmapService</code>.",
    fields:[{name:"full_customer_access",type:"bool | None",n:"opt",desc:"Expose customer PII and enable payment/modification ops (default <code>False</code>)."}]},
   {name:"AppUtilitiesError",kind:"error class",file:"src/peek_app_utilities/errors.py",
    desc:"Base class for every error this package raises on its own, so <code>except AppUtilitiesError</code> catches anything package-originated (token-verification failures come from PyJWT and are separate).",
    def:"class AppUtilitiesError(Exception)"},
   {name:"PiiAccessDisabledError",kind:"error class",file:"src/peek_app_utilities/errors.py",desc:"Raised by PII-gated <code>BookingService</code> methods (<code>get_payments_on_file</code>, <code>make_payment</code>, <code>refund</code>, <code>create_invoice_link</code>, <code>add_addon</code>, <code>remove_addon</code>) when <code>full_customer_access</code> is off — before any network call.",
    def:"class PiiAccessDisabledError(AppUtilitiesError):\n    def __init__(self, operation: str)",
-   fields:[{name:"operation",type:"str",n:false,desc:"The gated operation that was refused — the snake_case method name (e.g. <code>\"make_payment\"</code>)."}]}
+   fields:[{name:"operation",type:"str",n:false,desc:"The gated operation that was refused — the snake_case method name (e.g. <code>\"make_payment\"</code>)."}]},
+  {name:"InstallWebhookError",kind:"error class",file:"src/peek_app_utilities/errors.py",desc:"Raised by <code>parse_install_webhook</code> when the token is validly signed but the delivery is rejected: the token has no usable <code>sub</code>, the body <code>install_id</code> is present and not equal to it, or the body <code>api_url</code> is not a Peek-owned domain (<code>peek.com</code>/<code>peeklabs.com</code> or a subdomain). Subclasses PyJWT's <code>jwt.InvalidTokenError</code> as well as <code>AppUtilitiesError</code>, so a handler that already treats a failed token check as a rejected delivery (respond <code>401</code>) covers it unchanged.",
+   def:"class InstallWebhookError(jwt.InvalidTokenError, AppUtilitiesError):\n    def __init__(self, reason: InstallWebhookErrorReason)",
+   fields:[{name:"reason",type:"InstallWebhookErrorReason",n:false,desc:"Why the delivery was rejected."}]},
+  {name:"InstallWebhookErrorReason",kind:"type",file:"src/peek_app_utilities/errors.py",def:'Literal["install_id_mismatch", "missing_subject", "invalid_api_url"]',desc:"Why <code>InstallWebhookError</code> was raised: the body <code>install_id</code> is not the token <code>sub</code>, the token has no usable <code>sub</code>, or the body <code>api_url</code> is not a Peek-owned domain."},
+  {name:"UnknownSeatmapDisplayTypeError",kind:"error class",file:"src/peek_app_utilities/errors.py",desc:"Peek returned a section <code>display.type</code> the package does not recognize (outside <code>SEATMAP_DISPLAY_TYPES</code>). Raised by <code>SeatmapService.get_seatmap_for_product</code> / <code>get_seat_map_assignments</code> rather than silently widening <code>SeatmapDisplayType</code>, so a caller learns a new kind appeared.",
+   def:"class UnknownSeatmapDisplayTypeError(AppUtilitiesError):\n    def __init__(self, type_: str, known_types: Sequence[str])",
+   fields:[{name:"type",type:"str",n:false,desc:"The offending <code>display.type</code> value."}]},
+  {name:"UnknownSeatmapBlockStatusError",kind:"error class",file:"src/peek_app_utilities/errors.py",desc:"Peek returned a seat occupancy status the package does not recognize (outside <code>SEATMAP_BLOCK_STATUSES</code>). Raised by <code>SeatmapService.get_seat_map_assignments</code>.",
+   def:"class UnknownSeatmapBlockStatusError(AppUtilitiesError):\n    def __init__(self, status: str, known_statuses: Sequence[str])",
+   fields:[{name:"status",type:"str",n:false,desc:"The offending status value."}]},
+  {name:"UnknownSeatmapAssignmentParentError",kind:"error class",file:"src/peek_app_utilities/errors.py",desc:"A seat assignment's parent is of a kind the package does not recognize (it maps a booked ticket, a staff member, a field location, or a blocked seat to <code>SeatmapOccupantType</code>). Raised by <code>SeatmapService.get_seat_map_assignments</code>.",
+   def:"class UnknownSeatmapAssignmentParentError(AppUtilitiesError):\n    def __init__(self, typename: str, known_typenames: Sequence[str])",
+   fields:[{name:"typename",type:"str",n:false,desc:"The offending parent kind as reported by Peek."}]},
+  {name:"SeatmapDeleteError",kind:"error class",file:"src/peek_app_utilities/errors.py",desc:"Raised by <code>SeatmapService.delete_seat_assignments</code> when Peek reports a batch-level failure inside an otherwise-successful response (e.g. an invalid block count). Peek's explanation is the message; defaults to <code>\"Deleting seat assignments failed.\"</code> when none is given.",
+   def:"class SeatmapDeleteError(AppUtilitiesError):\n    def __init__(self, message: str | None = None)"}
  ]
 });
 </script>
