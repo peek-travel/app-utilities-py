@@ -49,6 +49,7 @@ from peek_app_utilities import (
     CreateBookingInput,
     CreateEngineInput,
     CreatePromoCodeInput,
+    CustomQuestionService,
     DailyNoteService,
     GuideAssignment,
     Logger,
@@ -62,6 +63,8 @@ from peek_app_utilities import (
     ResellerService,
     ResourcePoolService,
     ReviewService,
+    SeatmapBlockAssignment,
+    SeatmapService,
     SetMetaDataAttachmentInput,
     SetMetaDataGuestInput,
     TimeslotService,
@@ -214,6 +217,8 @@ class Ctx:
     memberships: MembershipService
     bookings: BookingService
     reviews: ReviewService
+    custom_questions: CustomQuestionService
+    seatmaps: SeatmapService
     aclose: Callable[[], Awaitable[None]]
     """Closes the harness-owned HTTP client."""
 
@@ -285,6 +290,8 @@ def build_context(auth_token: str, *, full_customer_access: bool) -> Ctx:
             options=BookingServiceOptions(access_options=access_options, integrator=integrator),
         ),
         reviews=ReviewService(client, access_options),
+        custom_questions=CustomQuestionService(client),
+        seatmaps=SeatmapService(client, access_options),
         aclose=http_client.aclose,
     )
 
@@ -498,6 +505,15 @@ REGISTRY: Final[Sequence[FnSpec]] = (
     # ── reviews ──
     FnSpec(name="get_reviews", group="reviews", desc="Reviews for an activity.", params=[p("product_id", S, "Activity id"), p("review_count", N, "Optional page size (1-50)", False), p("review_offset", N, "Optional offset", False)], run=lambda c, a: c.reviews.get_reviews(a[0], **_given(review_count=a[1], review_offset=a[2]))),
     FnSpec(name="get_all_review_summaries", group="reviews", desc="Per-activity review summaries.", params=[], run=lambda c, a: c.reviews.get_all_review_summaries()),
+    # ── custom questions ──
+    FnSpec(name="get_all_custom_questions", group="custom-questions", desc="All custom questions on the account.", params=[], run=lambda c, a: c.custom_questions.get_all()),
+    # ── seatmaps ──
+    FnSpec(name="get_seatmap_for_product", group="seatmaps", desc="Seating maps configured on an activity.", params=[p("product_id", S, "Activity id")], run=lambda c, a: c.seatmaps.get_seatmap_for_product(a[0])),
+    FnSpec(name="get_seatmap_ids_for_product", group="seatmaps", desc="Id + name of every seating map on an activity (no layout).", params=[p("product_id", S, "Activity id")], run=lambda c, a: c.seatmaps.get_seatmap_ids_for_product(a[0])),
+    FnSpec(name="get_seat_map_assignments", group="seatmaps", desc="A product's seating maps with seat occupancy over a datetime range (guest names need --pii).", params=[p("product_id", S, "Activity id"), p("range_start", S, "Naive start, e.g. 2026-11-06T14:00:00"), p("range_end", S, "Naive end, e.g. 2026-11-06T16:00:00")], run=lambda c, a: c.seatmaps.get_seat_map_assignments(a[0], a[1], a[2])),
+    FnSpec(name="assignable_bookings", group="seatmaps", desc="Confirmed bookings overlapping a range with their assignable tickets (guest names need --pii).", params=[p("product_id", S, "Activity id"), p("range_start", S, "Naive start, e.g. 2026-11-06T14:00:00"), p("range_end", S, "Naive end, e.g. 2026-11-06T15:00:00")], run=lambda c, a: c.seatmaps.assignable_bookings(a[0], a[1], a[2])),
+    FnSpec(name="assign_tickets_to_seats", group="seatmaps", desc="Bulk-assign tickets to seats. Returns SUCCESS/PARTIAL/FAILED.", params=[p("assignments", J, 'SeatmapBlockAssignment[] JSON, e.g. [{"assignableId":"t_A1","blockId":"csb_A1"}]')], run=lambda c, a: c.seatmaps.assign_tickets_to_seats(from_dict_list(SeatmapBlockAssignment, a[0]))),
+    FnSpec(name="delete_seat_assignments", group="seatmaps", desc="Delete seat assignments by id (asa_…). Returns the deleted assignments.", params=[p("assignment_ids", J, 'assignment id strings JSON, e.g. ["asa_9kQ2mNv","asa_7hL4pXw"]')], run=lambda c, a: c.seatmaps.delete_seat_assignments(list(a[0]))),
 )
 # fmt: on
 

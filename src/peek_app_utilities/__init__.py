@@ -21,10 +21,16 @@ from peek_app_utilities.errors import (
     AppUtilitiesError,
     CngApiError,
     CngPermissionError,
+    InstallWebhookError,
+    InstallWebhookErrorReason,
     PeekGraphQLError,
     PeekHttpError,
     PiiAccessDisabledError,
     RateLimitError,
+    SeatmapDeleteError,
+    UnknownSeatmapAssignmentParentError,
+    UnknownSeatmapBlockStatusError,
+    UnknownSeatmapDisplayTypeError,
 )
 from peek_app_utilities.internal.acme.products.product_service import AcmeProductService
 from peek_app_utilities.internal.cng.products.product_service import CngProductService
@@ -42,6 +48,9 @@ from peek_app_utilities.internal.peek.bookings.booking_service import (
     CancelBookingResult,
 )
 from peek_app_utilities.internal.peek.bookings.booking_webhook import parse_booking_webhook
+from peek_app_utilities.internal.peek.custom_questions.custom_question_service import (
+    CustomQuestionService,
+)
 from peek_app_utilities.internal.peek.daily_notes.daily_note_service import DailyNoteService
 from peek_app_utilities.internal.peek.installs.install_webhook import parse_install_webhook
 from peek_app_utilities.internal.peek.memberships.membership_service import MembershipService
@@ -59,6 +68,7 @@ from peek_app_utilities.internal.peek.resource_pools.resource_pool_service impor
     ResourcePoolService,
 )
 from peek_app_utilities.internal.peek.reviews.review_service import ReviewService
+from peek_app_utilities.internal.peek.seatmaps.seatmap_service import SeatmapService
 from peek_app_utilities.internal.peek.timeslots.timeslot_service import TimeslotService
 from peek_app_utilities.internal.peek.waivers.waiver_webhook import parse_waiver_webhook
 from peek_app_utilities.logger import Logger, logging_adapter, noop_logger
@@ -100,7 +110,6 @@ from peek_app_utilities.models.peek.booking import (
 )
 from peek_app_utilities.models.peek.booking_addon import (
     BookingAddon,
-    BookingAddonMoney,
     BookingAddonOption,
     BookingAddons,
     BookingAddonsMutationResult,
@@ -160,6 +169,7 @@ from peek_app_utilities.models.peek.membership import (
     MembershipPurchaseInput,
     PurchasedMembership,
 )
+from peek_app_utilities.models.peek.money import Money
 from peek_app_utilities.models.peek.pricing import (
     ActivityOverrides,
     ClearOverridesInput,
@@ -209,6 +219,36 @@ from peek_app_utilities.models.peek.resource_pool import (
     ResourcePoolMode,
 )
 from peek_app_utilities.models.peek.review import Guide, ProductReviewSummary, Review
+from peek_app_utilities.models.peek.seatmap import (
+    ASSIGNMENT_STATUSES,
+    SEATMAP_BLOCK_STATUSES,
+    SEATMAP_DISPLAY_TYPES,
+    SEATMAP_OCCUPANT_TYPES,
+    AssignableBooking,
+    AssignableTicket,
+    AssignedSeatmap,
+    AssignedSeatmapBlock,
+    AssignedSeatmapGroup,
+    AssignedSeatmapSection,
+    AssignmentResponse,
+    AssignmentStatus,
+    CurrentSeatAssignment,
+    DeletedSeatAssignment,
+    Seatmap,
+    SeatmapAssignment,
+    SeatmapBlock,
+    SeatmapBlockAssignment,
+    SeatmapBlockStatus,
+    SeatmapDisplay,
+    SeatmapDisplayType,
+    SeatmapGroup,
+    SeatmapOccupantType,
+    SeatmapSection,
+    SeatmapSummary,
+    SeatmapTicket,
+    SeatmapZone,
+    SuccessfulAssignment,
+)
 from peek_app_utilities.models.peek.timeslot import (
     GUIDE_ASSIGNMENT_ACTIONS,
     AssignedResource,
@@ -227,11 +267,15 @@ from peek_app_utilities.peek_access_service import PeekAccessService, PeekAccess
 __all__ = [
     "ACTIVITY_PRODUCT_TYPE",
     "ADD_ON_PRODUCT_TYPE",
+    "ASSIGNMENT_STATUSES",
     "GUIDE_ASSIGNMENT_ACTIONS",
     "INSTALL_STATUSES",
     "PEEK_PLATFORMS",
     "PROMO_DISCOUNT_TYPES",
     "RENTAL_PRODUCT_TYPE",
+    "SEATMAP_BLOCK_STATUSES",
+    "SEATMAP_DISPLAY_TYPES",
+    "SEATMAP_OCCUPANT_TYPES",
     "AccessOptions",
     "AccountUser",
     "AccountUserService",
@@ -252,8 +296,16 @@ __all__ = [
     "AssignGuideError",
     "AssignGuideResult",
     "AssignGuideStatus",
+    "AssignableBooking",
+    "AssignableTicket",
     "AssignedActivity",
     "AssignedResource",
+    "AssignedSeatmap",
+    "AssignedSeatmapBlock",
+    "AssignedSeatmapGroup",
+    "AssignedSeatmapSection",
+    "AssignmentResponse",
+    "AssignmentStatus",
     "Availability",
     "AvailabilityService",
     "AvailabilityTime",
@@ -261,7 +313,6 @@ __all__ = [
     "BaseAccessServiceConfig",
     "Booking",
     "BookingAddon",
-    "BookingAddonMoney",
     "BookingAddonOption",
     "BookingAddons",
     "BookingAddonsMutationResult",
@@ -287,12 +338,15 @@ __all__ = [
     "CreatedBooking",
     "CreatedPricingEngine",
     "CreatedPromoCode",
+    "CurrentSeatAssignment",
     "CustomQuestion",
     "CustomQuestionAnswer",
     "CustomQuestionAnswerInput",
     "CustomQuestionOption",
+    "CustomQuestionService",
     "DailyNote",
     "DailyNoteService",
+    "DeletedSeatAssignment",
     "Duration",
     "DurationLength",
     "FixedResourceOptionOverride",
@@ -306,6 +360,8 @@ __all__ = [
     "InstallAccessTarget",
     "InstallStatus",
     "InstallWebhook",
+    "InstallWebhookError",
+    "InstallWebhookErrorReason",
     "InvoiceLinkResult",
     "Logger",
     "MakePaymentInput",
@@ -343,6 +399,7 @@ __all__ = [
     "MetaDataVolumeValue",
     "MetaDataWeightUnit",
     "MetaDataWeightValue",
+    "Money",
     "NoteMode",
     "OverrideMode",
     "Payment",
@@ -396,16 +453,35 @@ __all__ = [
     "ResourcePoolService",
     "Review",
     "ReviewService",
+    "Seatmap",
+    "SeatmapAssignment",
+    "SeatmapBlock",
+    "SeatmapBlockAssignment",
+    "SeatmapBlockStatus",
+    "SeatmapDeleteError",
+    "SeatmapDisplay",
+    "SeatmapDisplayType",
+    "SeatmapGroup",
+    "SeatmapOccupantType",
+    "SeatmapSection",
+    "SeatmapService",
+    "SeatmapSummary",
+    "SeatmapTicket",
+    "SeatmapZone",
     "SetMetaDataAttachmentInput",
     "SetMetaDataGuestInput",
     "SetMetaDataResult",
     "SpotsTakenBounds",
     "SpotsTakenFilter",
     "StartTimeRangeFilter",
+    "SuccessfulAssignment",
     "Ticket",
     "Timeslot",
     "TimeslotFilter",
     "TimeslotService",
+    "UnknownSeatmapAssignmentParentError",
+    "UnknownSeatmapBlockStatusError",
+    "UnknownSeatmapDisplayTypeError",
     "UpdateEngineInput",
     "UpdateTimeslotResult",
     "UpsertOverridesInput",

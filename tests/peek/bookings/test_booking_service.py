@@ -1,5 +1,6 @@
+import json
 import re
-from collections.abc import Awaitable, Callable, Sequence
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import replace
 from typing import Any, cast
 
@@ -27,7 +28,6 @@ from peek_app_utilities.models.peek.booking import (
 )
 from peek_app_utilities.models.peek.booking_addon import (
     BookingAddon,
-    BookingAddonMoney,
     BookingAddonOption,
     BookingAddons,
 )
@@ -46,6 +46,7 @@ from peek_app_utilities.models.peek.booking_payment import (
     RefundInput,
 )
 from peek_app_utilities.models.peek.custom_question import CustomQuestion, CustomQuestionOption
+from peek_app_utilities.models.peek.money import Money
 from peek_app_utilities.models.peek.product import Product, ProductTicket
 from tests.conftest import FakeGraphQLClient, RecordedCall
 
@@ -960,7 +961,7 @@ ADDON = Product(
 )
 
 ADDON_MONEY = {"amount": "10.00", "currency": "USD", "formatted": "$10.00"}
-ADDON_MONEY_MODEL = BookingAddonMoney(amount="10.00", currency="USD", formatted="$10.00")
+ADDON_MONEY_MODEL = Money(amount="10.00", currency="USD", formatted="$10.00")
 
 
 def option_node(**overrides: Any) -> dict[str, Any]:
@@ -1412,6 +1413,86 @@ def quote_tickets(gql: FakeGraphQLClient) -> list[dict[str, Any]]:
     return cast("list[dict[str, Any]]", booking_quote_of(gql)["tickets"])
 
 
+def quote_promo_codes(gql: FakeGraphQLClient) -> list[dict[str, Any]] | None:
+    return cast("list[dict[str, Any]] | None", quote_input_of(gql).get("promoCodes"))
+
+
+UUID_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.I)
+
+NEW_BOOKING_REFID = "<booking-quote-refid>"
+"""Placeholder in a queued ``amendOrder`` response, swapped at request time for
+the booking-quote refid the service generated (captured off ``updateQuoteV2``)."""
+
+
+def money(amount: str) -> dict[str, Any]:
+    return {"total": {"amount": amount, "currency": "USD", "formatted": f"${amount}"}}
+
+
+# The amend path (createQuoteFromOrder → updateQuoteV2 → amendOrder). The amended
+# order echoes the booking-quote refid back on the new Booking sale, alongside an
+# unrelated pre-existing booking, so the service must select by refid rather than
+# list position.
+AMEND_CREATE_QUOTE_OK = {
+    "createQuoteFromOrder": {"errors": None, "quote": {"id": "aq-1", "saleQuotes": []}}
+}
+AMEND_UPDATE_OK = {"updateQuoteV2": {"errors": None, "quote": {"id": "aq-1"}}}
+AMEND_CREATE_OK: dict[str, Any] = {
+    "amendOrder": {
+        "errors": None,
+        "order": {
+            "id": "o_parent",
+            "sales": [
+                # A pre-existing booking that must NOT be picked.
+                {
+                    "__typename": "Booking",
+                    "id": "b_old",
+                    "displayId": "B-OLD",
+                    "refid": "refid-old",
+                    "balance": money("100.00"),
+                },
+                {
+                    "__typename": "Booking",
+                    "id": "b_new",
+                    "displayId": "B-NEW",
+                    "refid": NEW_BOOKING_REFID,
+                    "balance": money("40.00"),
+                },
+            ],
+        },
+    }
+}
+AMEND_PAYMENT_OK = {"applyPaymentToOrder": {"transactionId": "tx-amend", "errors": None}}
+
+
+class AmendEchoClient(FakeGraphQLClient):
+    """A :class:`FakeGraphQLClient` whose ``amendOrder`` response carries the
+    booking-quote refid the service generated (captured off the ``updateQuoteV2``
+    call) wherever the queued response holds :data:`NEW_BOOKING_REFID`."""
+
+    async def request(
+        self, endpoint_name: str, query: str, variables: Mapping[str, Any]
+    ) -> dict[str, Any]:
+        body = await super().request(endpoint_name, query, variables)
+        if "amendOrder" in query:
+            refid = update_quote_booking_quotes(self)[0]["refid"]
+            body = cast(
+                "dict[str, Any]", json.loads(json.dumps(body).replace(NEW_BOOKING_REFID, refid))
+            )
+        return body
+
+
+def queue_amend_create(
+    *,
+    amend: dict[str, Any] = AMEND_CREATE_OK,
+    payment: dict[str, Any] | None = None,
+) -> AmendEchoClient:
+    gql = AmendEchoClient()
+    gql.queue(AMEND_CREATE_QUOTE_OK).queue(AMEND_UPDATE_OK).queue(amend)
+    if payment is not None:
+        gql.queue(payment)
+    return gql
+
+
 def eur_product(product_id: str = "act-1") -> Product:
     return replace(ADDON, product_id=product_id, type="ACTIVITY", currency="EUR", tickets=[])
 
@@ -1570,10 +1651,148 @@ class TestCreate:
             await service.create(replace(VALID_CREATE, list_price="abc"))
         assert gql.calls == []
 
-    async def test_clones_from_a_parent_order_when_provided(self, gql: FakeGraphQLClient):
+    async def test_attaches_a_promo_code_to_the_quote_as_an_enabled_code_with_a_fresh_refid(
+        self, gql: FakeGraphQLClient
+    ):
         service, _ = make_service(queue_create(gql))
+
+        await service.create(replace(VALID_CREATE, promo_code="SAVE10"))
+
+        promo_codes = quote_promo_codes(gql)
+        assert promo_codes is not None
+        assert len(promo_codes) == 1
+        assert promo_codes[0]["code"] == "SAVE10"
+        assert promo_codes[0]["isEnabled"] is True
+        # refid is a freshly generated UUID.
+        assert UUID_RE.match(promo_codes[0]["refid"])
+
+    async def test_trims_surrounding_whitespace_from_the_promo_code(self, gql: FakeGraphQLClient):
+        service, _ = make_service(queue_create(gql))
+
+        await service.create(replace(VALID_CREATE, promo_code="  SAVE10  "))
+
+        promo_codes = quote_promo_codes(gql)
+        assert promo_codes is not None
+        assert promo_codes[0]["code"] == "SAVE10"
+
+    @pytest.mark.parametrize(
+        "promo_code", [None, "", "   "], ids=["omitted", "empty", "whitespace"]
+    )
+    async def test_sends_no_promo_codes_when_the_promo_code_is_absent(
+        self, gql: FakeGraphQLClient, promo_code: str | None
+    ):
+        service, _ = make_service(queue_create(gql))
+
+        await service.create(replace(VALID_CREATE, promo_code=promo_code))
+
+        assert quote_promo_codes(gql) is None
+
+    async def test_rejects_a_promo_code_combined_with_parent_order_id_before_any_network_call(
+        self, gql: FakeGraphQLClient
+    ):
+        service, _ = make_service(gql)
+
+        with pytest.raises(ValueError, match="promoCode cannot be combined with parentOrderId"):
+            await service.create(
+                replace(VALID_CREATE, promo_code="SAVE10", parent_order_id="o_parent")
+            )
+        assert gql.calls == []
+
+    async def test_allows_parent_order_id_when_the_promo_code_is_only_whitespace(self):
+        service, _ = make_service(queue_amend_create())
+
+        assert (
+            await service.create(
+                replace(VALID_CREATE, promo_code="   ", parent_order_id="o_parent")
+            )
+            is not None
+        )
+
+    async def test_attaches_to_an_existing_order_via_the_amend_path_selecting_by_refid(self):
+        gql = queue_amend_create()
+        service, _ = make_service(gql)
+
+        result = await service.create(replace(VALID_CREATE, parent_order_id="o_parent"))
+
+        # The new order path (createQuoteV2 → createOrderFromQuote) is never used.
+        assert calls_with(gql, "createQuoteV2") == []
+        assert calls_with(gql, "createOrderFromQuote") == []
+        # The amend chain ran, bound to the order.
+        assert call_with(gql, "createQuoteFromOrder").variables["input"] == {
+            "orderId": "o_parent",
+            "quoteInput": {},
+        }
+        assert call_with(gql, "amendOrder").variables["input"] == {
+            "quoteId": "aq-1",
+            "orderId": "o_parent",
+        }
+
+        # Resolved from the Booking whose refid matched (b_new), not list position.
+        assert result == CreatedBooking(
+            order_id="o_parent",
+            booking_id="b_new",
+            display_id="B-NEW",
+            balance_amount="40.00",
+            balance_currency="USD",
+            balance_formatted="$40.00",
+        )
+
+    async def test_stamps_reservation_status_confirmed_on_the_amend_quote(self):
+        gql = queue_amend_create()
+        service, _ = make_service(gql)
         await service.create(replace(VALID_CREATE, parent_order_id="o_parent"))
-        assert quote_input_of(gql)["source"] == {"clonedFromId": "o_parent"}
+
+        bq = update_quote_booking_quotes(gql)[0]
+        assert bq["reservationStatus"] == "CONFIRMED"
+        assert all(t["reservationStatus"] == "CONFIRMED" for t in bq["tickets"])
+
+    async def test_marks_the_amended_booking_paid_using_its_own_balance(self):
+        gql = queue_amend_create(payment=AMEND_PAYMENT_OK)
+        service, _ = make_service(gql)
+        result = await service.create(
+            replace(
+                VALID_CREATE, parent_order_id="o_parent", mark_as_paid=True, idempotency_key="k1"
+            )
+        )
+        assert result.transaction_id == "tx-amend"
+        pay_input = call_with(gql, "applyPaymentToOrder").variables["input"]
+        # The new booking's balance, not the order total.
+        assert pay_input["amount"] == {"amount": "40.00", "currency": "USD"}
+        assert pay_input["orderId"] == "o_parent"
+        assert pay_input["scopedTo"] == ["b_new"]
+
+    async def test_hard_fails_when_the_amended_order_has_no_booking_matching_the_refid(self):
+        amend = {
+            "amendOrder": {
+                "errors": None,
+                "order": {
+                    "id": "o_parent",
+                    "sales": [
+                        {
+                            "__typename": "Booking",
+                            "id": "b_old",
+                            "displayId": "B-OLD",
+                            "refid": "refid-old",
+                            "balance": None,
+                        }
+                    ],
+                },
+            }
+        }
+        service, _ = make_service(queue_amend_create(amend=amend))
+        with pytest.raises(ValueError, match="did not contain a booking matching"):
+            await service.create(replace(VALID_CREATE, parent_order_id="o_parent"))
+
+    async def test_raises_when_the_amend_order_step_fails(self):
+        amend = {
+            "amendOrder": {
+                "errors": [{"code": "stale_quote", "detail": "x", "value": None}],
+                "order": None,
+            }
+        }
+        service, _ = make_service(queue_amend_create(amend=amend))
+        with pytest.raises(ValueError, match="Failed to amend order"):
+            await service.create(replace(VALID_CREATE, parent_order_id="o_parent"))
 
     async def test_resolves_custom_question_answers_by_id_and_text_onto_the_quote(
         self, gql: FakeGraphQLClient
@@ -1733,10 +1952,8 @@ class TestCreate:
         )
 
     @pytest.mark.parametrize("parent_order_id", ["o_abc123", "O-123ABC"])
-    async def test_accepts_a_valid_parent_order_id(
-        self, gql: FakeGraphQLClient, parent_order_id: str
-    ):
-        service, _ = make_service(queue_create(gql))
+    async def test_accepts_a_valid_parent_order_id(self, parent_order_id: str):
+        service, _ = make_service(queue_amend_create())
         assert (
             await service.create(replace(VALID_CREATE, parent_order_id=parent_order_id)) is not None
         )

@@ -11,14 +11,14 @@ import asyncio
 from dataclasses import dataclass
 from typing import Any, Final
 
-from peek_app_utilities.internal.peek.gateway_endpoints import SALES_ENDPOINT
-from peek_app_utilities.internal.peek.graphql_client import GraphQLClient
-from peek_app_utilities.internal.peek.products.custom_question_converter import (
+from peek_app_utilities.internal.peek.custom_questions.custom_question_converter import (
     from_question_configurations,
 )
-from peek_app_utilities.internal.peek.products.custom_question_queries import (
+from peek_app_utilities.internal.peek.custom_questions.custom_question_queries import (
     CUSTOM_QUESTIONS_QUERY,
 )
+from peek_app_utilities.internal.peek.gateway_endpoints import SALES_ENDPOINT
+from peek_app_utilities.internal.peek.graphql_client import GraphQLClient
 from peek_app_utilities.internal.peek.products.product_converter import (
     from_activities,
     from_item_option_nodes,

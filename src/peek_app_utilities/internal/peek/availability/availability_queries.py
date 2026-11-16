@@ -1,20 +1,13 @@
 """Raw Peek GraphQL query and response shape for availability times. Internal.
-The node matches the public :class:`AvailabilityTime` model one-to-one, so the
-only mapping is the camelCase → snake_case rename done by
-:func:`from_availability_time_node`.
+The raw node is mapped to the public :class:`AvailabilityTime` model by the
+availability converter.
 """
 
 from __future__ import annotations
 
 from typing import Any, Final, TypedDict
 
-from peek_app_utilities.models.peek.availability_time import (
-    Availability,
-    AvailabilityTime,
-    AvailabilityTimesQuery,
-    Duration,
-    DurationLength,
-)
+from peek_app_utilities.models.peek.availability_time import AvailabilityTimesQuery
 
 AVAILABILITY_TIMES_QUERY: Final = """
   query Sales($activityId: ID!, $resourceOptionQuantities: [ResourceOptionQuantityData!]!, $date: Date!) {
@@ -31,6 +24,11 @@ AVAILABILITY_TIMES_QUERY: Final = """
         }
       }
       status
+      price {
+        amount
+        currency
+        formatted
+      }
       availability {
         qty
         taken
@@ -52,6 +50,12 @@ class DurationNode(TypedDict, total=False):
     length: DurationLengthNode | None
 
 
+class MoneyNode(TypedDict, total=False):
+    amount: str | None
+    currency: str | None
+    formatted: str | None
+
+
 class AvailabilityNode(TypedDict, total=False):
     qty: int | None
     taken: int | None
@@ -68,6 +72,7 @@ AvailabilityTimeNode = TypedDict(
         "end": str,
         "duration": DurationNode | None,
         "status": str,
+        "price": MoneyNode | None,
         "availability": list[AvailabilityNode] | None,
     },
     total=False,
@@ -91,31 +96,3 @@ def build_availability_times_variables(query: AvailabilityTimesQuery) -> dict[st
         ],
         "date": query.date,
     }
-
-
-def from_availability_time_node(node: AvailabilityTimeNode) -> AvailabilityTime:
-    """Renames a raw availability-time node into the clean :class:`AvailabilityTime`."""
-    duration: DurationNode = node.get("duration") or {}
-    length: DurationLengthNode = duration.get("length") or {}
-    return AvailabilityTime(
-        id=node.get("id") or "",
-        time=node.get("time") or "",
-        from_=node.get("from") or "",
-        end=node.get("end") or "",
-        duration=Duration(
-            name=duration.get("name") or "",
-            length=DurationLength(
-                amount=int(length.get("amount") or 0), unit=length.get("unit") or ""
-            ),
-        ),
-        status=node.get("status") or "",
-        availability=[_from_availability_node(a) for a in node.get("availability") or []],
-    )
-
-
-def _from_availability_node(node: AvailabilityNode) -> Availability:
-    return Availability(
-        qty=int(node.get("qty") or 0),
-        taken=int(node.get("taken") or 0),
-        resource_option_id=node.get("resourceOptionId") or "",
-    )

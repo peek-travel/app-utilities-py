@@ -16,9 +16,9 @@ from typing import Any, Final
 from peek_app_utilities.internal.peek.bookings.addon_queries import ADDON_OPTION_STATUS_CANCELED
 from peek_app_utilities.models.peek.booking_addon import (
     BookingAddon,
-    BookingAddonMoney,
     BookingAddonOption,
 )
+from peek_app_utilities.models.peek.money import Money
 
 ERROR_INCONSISTENT_ADDON_ITEM_ID: Final = "Add-on group contains options with mismatched item IDs"
 
@@ -44,17 +44,17 @@ class AddonItem:
     booking_id: str
     display_id: str
     order_id: str
-    total: BookingAddonMoney | None
+    total: Money | None
     booking_quote_refid: str
     booking_quote_reservation_status: str
     addon_item_options: list[AddonItemOption]
 
 
-def _to_addon_money(raw: Any) -> BookingAddonMoney | None:
+def _to_addon_money(raw: Any) -> Money | None:
     if not raw:
         return None
     node: Mapping[str, Any] = raw
-    return BookingAddonMoney(
+    return Money(
         amount=node.get("amount") or "",
         currency=node.get("currency") or "",
         formatted=node.get("formatted") or "",

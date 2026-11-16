@@ -18,7 +18,7 @@ SDK_HEADER_NAME: Final = "x-peek-sdk"
 
 _SDK_PLATFORM: Final = "py"
 
-SDK_VERSION: Final = "0.9.4"
+SDK_VERSION: Final = "1.3.0"
 """Must equal ``project.version`` in ``pyproject.toml``."""
 
 SDK_HEADER_VALUE: Final = f"{_SDK_PLATFORM}-{SDK_VERSION}"

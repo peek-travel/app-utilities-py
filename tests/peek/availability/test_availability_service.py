@@ -9,6 +9,7 @@ from peek_app_utilities.models.peek.availability_time import (
     DurationLength,
     ResourceOptionQuantity,
 )
+from peek_app_utilities.models.peek.money import Money
 
 SLOT = {
     "id": "slot-1",
@@ -17,11 +18,12 @@ SLOT = {
     "end": "2026-01-02T11:00:00Z",
     "duration": {"name": "1h", "length": {"amount": 60, "unit": "MINUTES"}},
     "status": "AVAILABLE",
+    "price": {"amount": "50.00", "currency": "USD", "formatted": "$50.00"},
     "availability": [{"qty": 10, "taken": 2, "resourceOptionId": "r1"}],
 }
 
 
-async def test_sends_the_query_variables_and_returns_the_slots(gql):
+async def test_sends_the_query_variables_and_returns_the_converted_slots(gql):
     gql.queue({"availabilityTimes": [SLOT]})
 
     result = await AvailabilityService(gql).get_availability_times(
@@ -42,6 +44,7 @@ async def test_sends_the_query_variables_and_returns_the_slots(gql):
             end="2026-01-02T11:00:00Z",
             duration=Duration(name="1h", length=DurationLength(amount=60, unit="MINUTES")),
             status="AVAILABLE",
+            price=Money(amount="50.00", currency="USD", formatted="$50.00"),
             availability=[Availability(qty=10, taken=2, resource_option_id="r1")],
         )
     ]
@@ -80,5 +83,6 @@ async def test_degrades_a_sparse_slot_instead_of_raising(gql):
         end="",
         duration=Duration(name="", length=DurationLength(amount=0, unit="")),
         status="",
+        price=None,
         availability=[],
     )

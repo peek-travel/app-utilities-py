@@ -1,7 +1,8 @@
-from peek_app_utilities.internal.peek.products.custom_question_converter import (
+from peek_app_utilities.internal.peek.custom_questions.custom_question_converter import (
     from_question_configurations,
+    from_question_nodes,
 )
-from peek_app_utilities.internal.peek.products.custom_question_queries import (
+from peek_app_utilities.internal.peek.custom_questions.custom_question_queries import (
     QuestionConfigurationNode,
 )
 from peek_app_utilities.models.peek.custom_question import CustomQuestion, CustomQuestionOption
@@ -92,3 +93,57 @@ def test_defaults_missing_config_question_fields_to_safe_values():
 
 def test_returns_an_empty_list_for_no_configurations():
     assert from_question_configurations([]) == []
+
+
+def test_from_question_nodes_maps_bare_nodes_defaulting_order_and_is_required():
+    questions = [
+        {
+            "id": "cq_gw5xn",
+            "questionType": "TEXT",
+            "text": "Text Input",
+            "answerDefaultValue": None,
+            "hint": "this is a hint text",
+            "internalLabel": None,
+            "perGuest": False,
+        }
+    ]
+    assert from_question_nodes(questions) == [
+        CustomQuestion(
+            id="cq_gw5xn",
+            order=0,
+            is_required=False,
+            question_text="Text Input",
+            hint_text="this is a hint text",
+            question_type="TEXT",
+            internal_label=None,
+            per_guest=False,
+            default_value=None,
+            options=[],
+        )
+    ]
+
+
+def test_from_question_nodes_maps_a_choice_questions_options():
+    questions = [
+        {
+            "id": "cq_bq48e",
+            "questionType": "SELECT_ONE",
+            "text": "Multiple Choice",
+            "perGuest": True,
+            "options": [
+                {"id": "cqao_mwdgvw", "text": "Option A", "order": 1},
+                {"id": "cqao_va78v7", "text": "Option B", "order": 2},
+            ],
+        }
+    ]
+    [question] = from_question_nodes(questions)
+    assert question.question_type == "SELECT_ONE"
+    assert question.per_guest is True
+    assert question.options == [
+        CustomQuestionOption(id="cqao_mwdgvw", order=1, value="Option A"),
+        CustomQuestionOption(id="cqao_va78v7", order=2, value="Option B"),
+    ]
+
+
+def test_from_question_nodes_returns_an_empty_list_for_no_questions():
+    assert from_question_nodes([]) == []

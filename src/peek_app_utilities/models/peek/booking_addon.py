@@ -9,17 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-
-@dataclass(frozen=True, slots=True, kw_only=True)
-class BookingAddonMoney:
-    """Money amount for an add-on line, as returned by the API."""
-
-    amount: str
-    """Numeric amount as a string (e.g. ``"10.00"``)."""
-    currency: str
-    """ISO currency code (e.g. ``"USD"``)."""
-    formatted: str
-    """Human-formatted amount (e.g. ``"$10.00"``)."""
+from peek_app_utilities.models.peek.money import Money
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -42,7 +32,7 @@ class BookingAddon:
     """The add-on item id (``itemSnapshot.id``)."""
     addon_name: str
     """The add-on item name (``itemSnapshot.name``)."""
-    total: BookingAddonMoney | None
+    total: Money | None
     """The booking line-item total for this add-on, when present."""
     addon_options: list[BookingAddonOption]
     """Live options on this add-on, combined by option id with a count."""

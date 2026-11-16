@@ -1,11 +1,34 @@
-"""Raw Peek GraphQL query and response shapes for an activity's custom
-questions. These are an internal implementation detail of the package and are
-deliberately not re-exported from the public entry point.
+"""Raw Peek GraphQL query and response shapes for custom questions — both the
+per-activity configuration read and the account-wide question catalog. These are
+an internal implementation detail of the package and are deliberately not
+re-exported from the public entry point.
 """
 
 from __future__ import annotations
 
 from typing import Final, TypedDict
+
+ALL_CUSTOM_QUESTIONS_QUERY: Final = """
+  query Sales {
+    questions {
+      id
+      questionType
+      text
+      answerDefaultValue
+      hint
+      internalLabel
+      perGuest
+      ... on ChoiceQuestion {
+        options {
+          id
+          text
+          order
+        }
+      }
+    }
+  }
+"""
+"""Fetches every custom question defined on the account, regardless of activity."""
 
 CUSTOM_QUESTIONS_QUERY: Final = """
   query Sales($id: ID!) {
@@ -78,3 +101,9 @@ class CustomQuestionsResponse(TypedDict, total=False):
     """The ``data`` payload of :data:`CUSTOM_QUESTIONS_QUERY`."""
 
     activity: CustomQuestionsActivityNode | None
+
+
+class AllCustomQuestionsResponse(TypedDict, total=False):
+    """The ``data`` payload of :data:`ALL_CUSTOM_QUESTIONS_QUERY`."""
+
+    questions: list[RawQuestionNode] | None

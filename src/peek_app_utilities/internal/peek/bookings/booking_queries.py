@@ -405,7 +405,18 @@ AMEND_ORDER_MUTATION: Final = """
   mutation AmendOrder($input: AmendOrderInput!) {
     amendOrder(input: $input) {
       errors { code detail value }
-      order { id }
+      order {
+        id
+        sales {
+          __typename
+          ... on Booking {
+            id
+            displayId
+            refid
+            balance { total { amount currency formatted } }
+          }
+        }
+      }
     }
   }
 """
@@ -547,3 +558,20 @@ class PaymentMutationError(TypedDict, total=False):
     code: str
     detail: str
     value: str | None
+
+
+class AmendOrderSaleNode(TypedDict, total=False):
+    """A sale node on an amended order; only ``Booking`` members carry the fields."""
+
+    __typename: str
+    id: str
+    displayId: str
+    refid: str
+    balance: dict[str, Any] | None
+
+
+class AmendOrderNode(TypedDict, total=False):
+    """The ``order`` returned by ``amendOrder``."""
+
+    id: str
+    sales: list[AmendOrderSaleNode]

@@ -15,7 +15,10 @@ ACME-only.
 
 from __future__ import annotations
 
-from typing import Any, Final
+from collections.abc import Sequence
+from typing import Any, Final, Literal
+
+import jwt
 
 # The HTTP status the CNG gateway uses for a missing-permission rejection.
 FORBIDDEN_STATUS: Final = 403
@@ -31,6 +34,27 @@ _PERMISSION_MESSAGE_UNKNOWN: Final = (
 _DEFAULT_ADMIN_MESSAGE: Final = "Admin account required"
 _DEFAULT_RATE_LIMIT_MESSAGE: Final = "Rate limit exceeded"
 _DEFAULT_GRAPHQL_MESSAGE: Final = "GraphQL request failed"
+_DEFAULT_SEATMAP_DELETE_MESSAGE: Final = "Deleting seat assignments failed."
+
+InstallWebhookErrorReason = Literal["install_id_mismatch", "missing_subject", "invalid_api_url"]
+"""Why :class:`InstallWebhookError` was raised."""
+
+INSTALL_WEBHOOK_INSTALL_ID_MISMATCH: Final = "install_id_mismatch"
+"""The body ``install_id`` is not the token ``sub``."""
+INSTALL_WEBHOOK_MISSING_SUBJECT: Final = "missing_subject"
+"""The verified token has no ``sub``."""
+INSTALL_WEBHOOK_INVALID_API_URL: Final = "invalid_api_url"
+"""The ``api_url`` targets a non-Peek domain."""
+
+_INSTALL_WEBHOOK_MESSAGES: Final[dict[str, str]] = {
+    INSTALL_WEBHOOK_INSTALL_ID_MISMATCH: (
+        "Install webhook body install_id does not match the token subject"
+    ),
+    INSTALL_WEBHOOK_MISSING_SUBJECT: "Install webhook token has no subject (install id)",
+    INSTALL_WEBHOOK_INVALID_API_URL: (
+        "Install webhook apiUrl must be a Peek-owned domain (peek.com or peeklabs.com)"
+    ),
+}
 
 
 def _build_permission_message(permissions: list[str]) -> str:
@@ -108,6 +132,58 @@ class PiiAccessDisabledError(AppUtilitiesError):
         self.operation = operation
 
 
+class UnknownSeatmapDisplayTypeError(AppUtilitiesError):
+    """The Peek API returned a seatmap ``display.type`` the package does not
+    recognize. The known set is small and API-owned (``SEATMAP_DISPLAY_TYPES``);
+    rather than silently widening the clean model's ``type``, the seatmap
+    converter raises this so a caller learns a new kind appeared. The offending
+    value is on :attr:`type`."""
+
+    def __init__(self, type_: str, known_types: Sequence[str]) -> None:
+        super().__init__(
+            f'Unknown seatmap display type "{type_}" returned by the gateway; '
+            f"expected one of: {', '.join(known_types)}."
+        )
+        self.type = type_
+
+
+class UnknownSeatmapBlockStatusError(AppUtilitiesError):
+    """The Peek API returned a seat ``availability.status`` the package does not
+    recognize (``SEATMAP_BLOCK_STATUSES``). Raised by
+    ``SeatmapService.get_seat_map_assignments``; the value is on :attr:`status`."""
+
+    def __init__(self, status: str, known_statuses: Sequence[str]) -> None:
+        super().__init__(
+            f'Unknown seatmap block status "{status}" returned by the gateway; '
+            f"expected one of: {', '.join(known_statuses)}."
+        )
+        self.status = status
+
+
+class UnknownSeatmapAssignmentParentError(AppUtilitiesError):
+    """A seat assignment's ``parent`` carries a ``__typename`` the package does not
+    recognize (``Ticket``/``AccountUser``/``FieldLocation``/``BlockedSeat``).
+    Raised by ``SeatmapService.get_seat_map_assignments``; the value is on
+    :attr:`typename`."""
+
+    def __init__(self, typename: str, known_typenames: Sequence[str]) -> None:
+        super().__init__(
+            f'Unknown seatmap assignment parent "{typename}" returned by the gateway; '
+            f"expected one of: {', '.join(known_typenames)}."
+        )
+        self.typename = typename
+
+
+class SeatmapDeleteError(AppUtilitiesError):
+    """``SeatmapService.delete_seat_assignments`` got a non-success union member
+    back (e.g. ``AssignBlocksErrorInvalidBlockCount``) — a batch-level failure the
+    API reports inside an otherwise-successful response. The API's explanation is
+    the message."""
+
+    def __init__(self, message: str | None = None) -> None:
+        super().__init__(message or _DEFAULT_SEATMAP_DELETE_MESSAGE)
+
+
 class CngApiError(AppUtilitiesError):
     """The CNG REST API returned a non-2xx response that is not 418/429/403."""
 
@@ -141,3 +217,19 @@ class AcmeApiError(AppUtilitiesError):
         super().__init__(message or f"ACME request failed with HTTP {status_code}")
         self.status_code = status_code
         self.body = body
+
+
+class InstallWebhookError(jwt.InvalidTokenError, AppUtilitiesError):
+    """Raised by ``parse_install_webhook`` when the token signature is valid but
+    the delivery is rejected: the token has no ``sub``, the body ``install_id`` is
+    present and not equal to the token ``sub``, or the body carries an ``api_url``
+    whose host is not a Peek-owned domain. The cause is on :attr:`reason`.
+
+    It subclasses PyJWT's :class:`jwt.InvalidTokenError`, so a handler that
+    already treats a failed token check as a rejected delivery (respond 401)
+    handles it with no change.
+    """
+
+    def __init__(self, reason: InstallWebhookErrorReason) -> None:
+        super().__init__(_INSTALL_WEBHOOK_MESSAGES[reason])
+        self.reason: InstallWebhookErrorReason = reason

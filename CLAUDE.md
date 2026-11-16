@@ -62,6 +62,18 @@ GraphQL.
     caller-facing surface, not how the package talks to the API. The one
     deliberate exception is a single low-key `GraphQLClient` reference in the
     `PeekAccessService` description.
+- **`docs/html/changelog.html` is a generated mirror of `changelog.md` — never
+  hand-edit it.** It is the interactive HTML changelog (same shell as the platform
+  pages) and is linked from `docs/index.html`. `scripts/build-changelog-html.mjs`
+  (vendored from the TypeScript package, run with Node) renders `changelog.md` →
+  `docs/html/changelog.html`; `changelog.md` is the single source of truth.
+  **Whenever you touch `changelog.md`, regenerate the HTML in the same change** by
+  running `node scripts/build-changelog-html.mjs`, and commit both files together.
+  A pytest drift guard (`tests/test_changelog_html.py`) runs the script with
+  `--check` and fails if the committed HTML differs, so `pytest` catches a stale
+  file. If you change the page's styling or the Markdown renderer, do it in the
+  script and regenerate — not in the HTML. Internal doc build; do not log it in
+  `changelog.md`.
 - Ensure test coverage stays above 95% (the `pytest --cov` gate enforces
   `fail_under = 95` on lines and branches).
 - **Keep the `scripts/gql_cli` test harness in sync with the service surface.**
@@ -81,7 +93,9 @@ GraphQL.
   potentially breaking for an existing consumer MUST be recorded under the
   `## Unreleased` header with (a) what changed, (b) why, and (c) the concrete
   caller action. Caller-visible fixes and new capabilities may be logged too,
-  tagged `[fix]` / `[additive]`. **Do not** log internal-only work.
+  tagged `[fix]` / `[additive]`. **Do not** log internal-only work. **Whenever
+  you edit `changelog.md`, also regenerate `docs/html/changelog.html`**
+  (`node scripts/build-changelog-html.mjs`) and commit both.
 
 # Architecture conventions
 

@@ -10,12 +10,12 @@ from peek_app_utilities.internal.peek.bookings.addon_converter import (
 )
 from peek_app_utilities.models.peek.booking_addon import (
     BookingAddon,
-    BookingAddonMoney,
     BookingAddonOption,
 )
+from peek_app_utilities.models.peek.money import Money
 
 MONEY = {"amount": "10.00", "currency": "USD", "formatted": "$10.00"}
-MONEY_MODEL = BookingAddonMoney(amount="10.00", currency="USD", formatted="$10.00")
+MONEY_MODEL = Money(amount="10.00", currency="USD", formatted="$10.00")
 
 
 def node(**overrides: Any) -> dict[str, Any]:

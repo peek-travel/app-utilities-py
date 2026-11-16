@@ -10,6 +10,8 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass
 
+from peek_app_utilities.models.peek.money import Money
+
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class DurationLength:
@@ -64,6 +66,8 @@ class AvailabilityTime:
     """How long the slot runs."""
     status: str
     """Availability status reported by Peek (e.g. open/closed/sold-out)."""
+    price: Money | None
+    """Per-ticket price for the slot, when reported by Peek."""
     availability: list[Availability]
     """Remaining availability broken down per resource option. One entry per
     resource option offered for the slot."""

@@ -15,6 +15,9 @@ from peek_app_utilities.internal.peek.availability.availability_service import (
     AvailabilityService,
 )
 from peek_app_utilities.internal.peek.bookings.booking_service import BookingService
+from peek_app_utilities.internal.peek.custom_questions.custom_question_service import (
+    CustomQuestionService,
+)
 from peek_app_utilities.internal.peek.daily_notes.daily_note_service import DailyNoteService
 from peek_app_utilities.internal.peek.memberships.membership_service import MembershipService
 from peek_app_utilities.internal.peek.pricing.pricing_service import PricingService
@@ -25,6 +28,7 @@ from peek_app_utilities.internal.peek.resource_pools.resource_pool_service impor
     ResourcePoolService,
 )
 from peek_app_utilities.internal.peek.reviews.review_service import ReviewService
+from peek_app_utilities.internal.peek.seatmaps.seatmap_service import SeatmapService
 from peek_app_utilities.internal.peek.timeslots.timeslot_service import TimeslotService
 from peek_app_utilities.peek_access_service import PeekAccessService, PeekAccessServiceConfig
 from tests.conftest import RecordingLogger, json_response, mock_http_client
@@ -35,6 +39,7 @@ REQUIRED = {
     "issuer": "Peek Test",
     "app_id": "app-1",
     "gateway_key": "gw-key",
+    "mode": "v1",
 }
 INSTALL_ID = "8c1f32b4-ab3c-4e20-82b7-844ea9e03bc9"
 REGISTRY_ISSUER = "app_registry_v2"
@@ -135,6 +140,8 @@ def test_does_not_require_gateway_key_in_v2_mode():
         ("get_membership_service", MembershipService),
         ("get_booking_service", BookingService),
         ("get_review_service", ReviewService),
+        ("get_custom_question_service", CustomQuestionService),
+        ("get_seatmap_service", SeatmapService),
     ],
 )
 def test_accessors_return_the_service_and_memoize_the_instance(accessor: str, cls: type):
@@ -298,35 +305,30 @@ def test_defaults_missing_sub_and_display_version_to_empty_strings():
 # ─── v2 mode ─────────────────────────────────────────────────────────────────
 
 
-async def test_v2_uses_the_app_registry_base_url_by_default():
+async def test_v2_routes_through_the_slug_when_the_fallback_url_is_passed_as_api_url():
     client, calls = empty_products_client()
-    peek = PeekAccessService(config(mode="v2", http_client=client))
-    await peek.get_product_service().get_all_products()
-    assert str(calls[0].url) == (
-        "https://app-registry.peeklabs.com/installations-api/app-1/peek_backoffice_api-v1"
-    )
-
-
-async def test_v2_inserts_the_slug_with_a_custom_base_url():
-    client, calls = empty_products_client()
+    # A developer without a webhook api_url may pass the fallback base themselves.
     peek = PeekAccessService(
         config(
-            mode="v2",
-            http_client=client,
-            base_url="https://app-registry.prod.peeklabs.com/installations-api",
+            mode="v2", api_url="https://apps.peek.com/installations-api/app-1", http_client=client
         )
     )
     await peek.get_product_service().get_all_products()
-    assert str(calls[0].url) == (
-        "https://app-registry.prod.peeklabs.com/installations-api/app-1/peek_backoffice_api-v1"
+    assert (
+        str(calls[0].url) == "https://apps.peek.com/installations-api/app-1/peek_backoffice_api-v1"
     )
 
 
 async def test_v2_still_mints_and_sends_a_bearer_token():
     client, calls = empty_products_client()
-    peek = PeekAccessService(config(mode="v2", http_client=client))
+    peek = PeekAccessService(
+        config(
+            mode="v2", api_url="https://apps.peek.com/installations-api/app-1", http_client=client
+        )
+    )
     await peek.get_product_service().get_all_products()
     assert calls[0].headers["X-Peek-Auth"].startswith("Bearer ")
+    assert "pk-api-key" not in calls[0].headers
 
 
 # ─── api_url mode ────────────────────────────────────────────────────────────

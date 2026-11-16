@@ -401,7 +401,18 @@ class CreateBookingInput:
     skip_customer_email: bool | None = None
     """Suppress the customer confirmation email. Default: ``False``."""
     parent_order_id: str | None = None
-    """Clone the quote from an existing order."""
+    """Attach the new booking to an **existing** order instead of creating a new
+    one. When set (a valid order id, ``o_…``/``O-…``), the booking is added to
+    that order via an amendment, and the returned :class:`CreatedBooking` carries
+    that same ``order_id``. Omit to create the booking in its own new order."""
+    promo_code: str | None = None
+    """Promo code to apply to the booking's quote. When set to a non-empty string,
+    it is sent on the ``createQuoteV2`` quote as an enabled promo code (the API
+    validates and prices it). An empty/whitespace-only value or ``None`` is
+    treated as no promo code. Cannot be combined with ``parent_order_id``:
+    attaching to an existing order takes the amendment path, which does not
+    create a new quote, so a promo code there would be silently dropped —
+    creation raises instead."""
     mark_as_paid: bool | None = None
     """Mark the booking paid after creation (requires ``idempotency_key``)."""
     mark_as_paid_amount: str | None = None

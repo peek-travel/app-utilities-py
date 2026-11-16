@@ -81,9 +81,12 @@ def create_access_service_for_install(
     shared = {f.name: getattr(config, f.name) for f in fields(config)}
     platform = install.platform
     if platform == "peek":
+        # A persisted install with an `api_url` is always the v2 (registry)
+        # connection, so inject `mode="v2"` — required by `PeekAccessService`
+        # and inert for CNG/ACME (which have no mode).
         return PeekAccessService(
             PeekAccessServiceConfig(
-                install_id=install.install_id, api_url=install.api_url, **shared
+                install_id=install.install_id, api_url=install.api_url, mode="v2", **shared
             )
         )
     # CNG/ACME take the base config only: drop the Peek-only extras.

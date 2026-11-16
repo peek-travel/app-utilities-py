@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "peek-app-utilities"
-version = "0.9.4"
+version = "1.3.0"
 description = "Python SDK for the Peek, CNG, and ACME backoffice APIs — the Python port of @peektravel/app-utilities."
 readme = "README.md"
 license = "MIT"

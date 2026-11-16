@@ -29,7 +29,9 @@ DEFAULT_RETRY_DELAYS_MS: Final[tuple[int, ...]] = (1000, 2000, 4000)
 DEFAULT_HTTP_TIMEOUT_SECONDS: Final = 30.0
 """Default per-request timeout for the package-owned HTTP client."""
 
-GatewayMode = Literal["v2"]
+GatewayMode = Literal["v1", "v2"]
+"""Peek connection generation. ``"v2"`` is the registry connection (needs the
+install's ``api_url``); ``"v1"`` is the deprecated legacy gateway."""
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -49,7 +51,14 @@ class BaseAccessServiceConfig:
     still carries this platform's slug it is stripped back off; a URL carrying a
     *different* platform's slug makes the constructor raise. No app-id segment is
     inserted, so ``app_id`` is not required. Prefer this over
-    ``base_url``/``app_id``, which are deprecated."""
+    ``base_url``/``app_id``, which are deprecated.
+
+    For Peek ``mode="v2"`` this field is **required** (the constructor raises
+    without it). If you do not yet have a webhook ``api_url``, build one by
+    appending your **app slug** to the registry prefix:
+    ``https://apps.peek.com/installations-api/<app-slug>`` (the trailing
+    app-slug segment is required). Treat that as a transitional bridge and
+    prefer the ``api_url`` the install webhook delivers."""
     app_id: str | None = None
     """App ID, inserted into the gateway endpoint path.
 

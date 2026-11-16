@@ -46,6 +46,7 @@ from peek_app_utilities.internal.peek.bookings.booking_queries import (
     UPDATE_OPERATOR_NOTES_MUTATION,
     UPDATE_OPERATOR_STATUS_MUTATION,
     UPDATE_QUOTE_V2_MUTATION,
+    AmendOrderNode,
     build_booking_guests_query,
     build_bookings_listing_query,
     build_bookings_variables,
@@ -164,6 +165,14 @@ ERROR_NO_ADDON_OPTION_TO_REMOVE: Final = (
 ERROR_CREATE_QUOTE_FAILED: Final = "Failed to create quote from order"
 ERROR_UPDATE_QUOTE_FAILED: Final = "Failed to update quote with add-on"
 ERROR_AMEND_ORDER_FAILED: Final = "Failed to amend order with add-on"
+# `__typename` of the order's booking sales (vs. other sale-interface members).
+BOOKING_TYPENAME: Final = "Booking"
+ERROR_AMEND_NO_MATCHING_BOOKING: Final = (
+    "Amended order did not contain a booking matching the created refid"
+)
+ERROR_PROMO_CODE_WITH_PARENT_ORDER: Final = (
+    "promoCode cannot be combined with parentOrderId (the amendment path does not create a quote)"
+)
 ERROR_ADDON_NOT_FOUND: Final = "Add-on not found for the provided addonOptionId"
 ERROR_NO_CANCEL_DATA: Final = "No booking data returned from cancelBooking"
 ERROR_PAYMENT_SOURCE_NOT_FOUND: Final = "paymentSourceId not found for this booking"
@@ -899,14 +908,18 @@ class BookingService:
         if _has_errors(updated) or not updated.get("quote"):
             raise ValueError(ERROR_UPDATE_QUOTE_FAILED)
 
-    async def _amend_order_or_raise(self, quote_id: str, normalized_order_id: str) -> None:
-        """Runs ``amendOrder`` and validates the response."""
+    async def _amend_order_or_raise(
+        self, quote_id: str, normalized_order_id: str
+    ) -> AmendOrderNode:
+        """Runs ``amendOrder``, validates the response, and returns the amended order."""
         body = await self._request(
             AMEND_ORDER_MUTATION, {"input": {"quoteId": quote_id, "orderId": normalized_order_id}}
         )
         amended = _data(body).get("amendOrder") or {}
-        if _has_errors(amended) or not amended.get("order"):
+        order: AmendOrderNode | None = amended.get("order")
+        if _has_errors(amended) or not order:
             raise ValueError(ERROR_AMEND_ORDER_FAILED)
+        return order
 
     async def create(self, booking: CreateBookingInput) -> CreatedBooking:
         """Creates a booking via ``createQuoteV2`` → ``createOrderFromQuote``,
@@ -918,9 +931,11 @@ class BookingService:
         :raises ValueError: when ``activity_id``, ``availability_time_id``, a
             ticket ``resource_option_id``/positive ``quantity``, or the guest
             ``name`` is missing; when ``mark_as_paid`` is set without an
-            ``idempotency_key``; when ``list_price`` is malformed; when
-            ``require_required_questions`` is set and a required custom question
-            is left unanswered; or when the quote/order mutations fail
+            ``idempotency_key``; when ``promo_code`` is combined with
+            ``parent_order_id`` (the amendment path creates no quote); when
+            ``list_price`` is malformed; when ``require_required_questions`` is
+            set and a required custom question is left unanswered; or when the
+            quote/order mutations fail
         """
         _validate_create_input(booking)
 
@@ -980,9 +995,20 @@ class BookingService:
         if question_answers:
             booking_quote["questionAnswers"] = question_answers
 
-        quote_input: WirePayload = {"bookingQuotes": [booking_quote]}
+        # Attaching to an existing order is a different backend path: a brand-new
+        # quote always mints a brand-new order, so `createOrderFromQuote` can never
+        # add to one. Route through the amendment path instead.
         if booking.parent_order_id:
-            quote_input["source"] = {"clonedFromId": booking.parent_order_id}
+            return await self._create_via_amend(booking, booking_quote)
+
+        quote_input: WirePayload = {"bookingQuotes": [booking_quote]}
+        promo_code = _resolve_promo_code(booking)
+        if promo_code:
+            # The API validates and prices the code; we mint a fresh refid per
+            # code and always send it enabled.
+            quote_input["promoCodes"] = [
+                {"code": promo_code, "refid": str(uuid4()), "isEnabled": True}
+            ]
 
         # Step 1 — create the quote.
         quote_body = await self._request(
@@ -1018,6 +1044,69 @@ class BookingService:
         )
 
         # Step 3 — optionally mark the booking paid.
+        if booking.mark_as_paid:
+            transaction_id = await self._mark_created_booking_paid(created, booking)
+            created = replace(created, transaction_id=transaction_id)
+
+        return created
+
+    async def _create_via_amend(
+        self, booking: CreateBookingInput, booking_quote: WirePayload
+    ) -> CreatedBooking:
+        """Adds a new booking to an **existing** order (``booking.parent_order_id``)
+        via the amendment path — the same three-mutation chain the add-on flow
+        uses: ``createQuoteFromOrder`` (seeds a quote already bound to the order)
+        → ``updateQuoteV2`` (adds the new booking to that quote, in the sparse
+        input shape) → ``amendOrder`` (applies the quote to the order).
+        ``createOrderFromQuote`` is deliberately **not** called here: it always
+        mints a fresh order, so it can never attach to one.
+
+        The amended order holds every pre-existing booking plus the new one, so
+        the new booking is located by the client-generated ``refid`` carried
+        through on the quote (never by list position — that is only safe on the
+        new-order path where there is a single sale)."""
+        normalized_order_id = normalize_booking_id(booking.parent_order_id or "")
+        booking_refid = str(booking_quote["refid"])
+
+        # The sparse booking input drops the booking- and ticket-level
+        # reservationStatus defaults the strict input applies, so stamp CONFIRMED
+        # explicitly at both levels.
+        booking_quote["reservationStatus"] = RESERVATION_STATUS_CONFIRMED
+        for ticket in booking_quote["tickets"]:
+            ticket["reservationStatus"] = RESERVATION_STATUS_CONFIRMED
+
+        # Step 1 — seed an amendment quote bound to the order.
+        quote_id, _ = await self._create_quote_from_order_or_raise(normalized_order_id)
+        # Step 2 — add the new booking to that quote (sparse shape).
+        await self._update_quote_or_raise(quote_id, {"bookingQuotes": [booking_quote]})
+        # Step 3 — apply the quote to the existing order.
+        order = await self._amend_order_or_raise(quote_id, normalized_order_id)
+
+        # Select our booking by the refid we generated. A missing match means the
+        # amend did not add it — hard-fail rather than fall back to a wrong sale.
+        new_booking = next(
+            (
+                sale
+                for sale in order.get("sales") or []
+                if sale.get("__typename") == BOOKING_TYPENAME and sale.get("refid") == booking_refid
+            ),
+            None,
+        )
+        if not new_booking or not new_booking.get("id"):
+            raise ValueError(ERROR_AMEND_NO_MATCHING_BOOKING)
+        balance_total = (new_booking.get("balance") or {}).get("total") or {}
+
+        created = CreatedBooking(
+            order_id=order.get("id") or "",
+            booking_id=new_booking["id"],
+            display_id=new_booking.get("displayId") or "",
+            balance_amount=balance_total.get("amount") or _DEFAULT_BALANCE_AMOUNT,
+            balance_currency=balance_total.get("currency") or DEFAULT_CURRENCY,
+            balance_formatted=balance_total.get("formatted") or _DEFAULT_BALANCE_FORMATTED,
+        )
+
+        # Mark the new booking paid using its own balance (not the order total,
+        # which now includes the pre-existing bookings).
         if booking.mark_as_paid:
             transaction_id = await self._mark_created_booking_paid(created, booking)
             created = replace(created, transaction_id=transaction_id)
@@ -1258,6 +1347,15 @@ def _validate_create_input(booking: CreateBookingInput) -> None:
         raise ValueError(ERROR_IDEMPOTENCY_KEY_REQUIRED_FOR_PAID)
     if booking.parent_order_id:
         assert_order_id(booking.parent_order_id)
+        if _resolve_promo_code(booking):
+            raise ValueError(ERROR_PROMO_CODE_WITH_PARENT_ORDER)
+
+
+def _resolve_promo_code(booking: CreateBookingInput) -> str:
+    """Returns the booking's promo code trimmed of surrounding whitespace, or
+    ``""`` when none was supplied (``None``/empty/whitespace-only). A non-empty
+    result is applied to the ``createQuoteV2`` quote."""
+    return (booking.promo_code or "").strip()
 
 
 def parse_quantity(value: Any) -> int | None:
